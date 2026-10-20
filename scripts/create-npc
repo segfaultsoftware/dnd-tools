@@ -1,0 +1,1199 @@
+#!/usr/bin/env python3
+"""Generate grounded Sword Coast NPCs as ready-to-paste Markdown."""
+
+from __future__ import annotations
+
+import argparse
+import math
+import random
+import re
+import secrets
+import sys
+import textwrap
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+from npc_data import (
+    ABILITY_NAMES,
+    ALIGNMENTS,
+    ALIGNMENT_WEIGHTS,
+    ARCHETYPES,
+    BONDS,
+    BUILDS,
+    CATEGORY_WEIGHTS,
+    CLOTHING,
+    COMMON_MAGIC_ITEMS,
+    CR_ORDER,
+    CR_PROFILES,
+    CR_WEIGHTS,
+    CR_XP,
+    EYES,
+    FACES,
+    FACTIONS,
+    FACTION_WEIGHTS,
+    FAITHS,
+    FAITH_CATEGORY_BIAS,
+    FAITH_WEIGHTS,
+    FLAWS,
+    GENERAL_ITEMS,
+    GENDERS,
+    GOALS,
+    HAIR,
+    IDEALS,
+    KEEPSAKES,
+    LIFE_EVENTS,
+    LOCATIONS,
+    LOCATION_WEIGHTS,
+    MANNERISMS,
+    MARKS,
+    MINOR_WONDERS,
+    NAME_POOLS,
+    OBSTACLES,
+    OCCUPATIONS,
+    PERSONALITY_AXES,
+    PRONOUNS,
+    RUMORS,
+    SECRETS,
+    SKILL_ABILITIES,
+    SPECIES,
+    SPECIES_WEIGHTS,
+    TURNING_POINTS,
+    UNCOMMON_MAGIC_ITEMS,
+    UPBRINGINGS,
+    VOICES,
+)
+
+
+VERSION = "1.0.0"
+ABILITY_KEYS = ("str", "dex", "con", "int", "wis", "cha")
+NUMBER_WORDS = {1: "one", 2: "two", 3: "three", 4: "four"}
+CR_TARGET_ATTACK_BONUS = {
+    "0": 2, "1/8": 3, "1/4": 4, "1/2": 4, "1": 5,
+    "2": 5, "3": 5, "4": 6, "5": 7,
+}
+CR_TARGET_DAMAGE_PER_HIT = {
+    "0": 2, "1/8": 4, "1/4": 6, "1/2": 5, "1": 7,
+    "2": 10, "3": 11, "4": 15, "5": 14,
+}
+
+
+@dataclass(frozen=True)
+class PronounSet:
+    subject: str
+    object: str
+    possessive_adjective: str
+    possessive: str
+    reflexive: str
+
+    @property
+    def label(self) -> str:
+        return f"{self.subject}/{self.object}"
+
+    @property
+    def Subject(self) -> str:
+        return self.subject.capitalize()
+
+
+@dataclass
+class StatBlock:
+    size: str
+    alignment: str
+    armor_class: int
+    armor_note: str
+    initiative_mod: int
+    initiative_score: int
+    hit_points: int
+    hit_dice: str
+    speed: str
+    abilities: dict[str, int]
+    saves: dict[str, int]
+    skills: dict[str, int]
+    gear: list[str]
+    senses: str
+    languages: list[str]
+    cr: str
+    xp: int
+    proficiency_bonus: int
+    traits: list[tuple[str, str]]
+    actions: list[tuple[str, str]]
+    bonus_actions: list[tuple[str, str]]
+    reactions: list[tuple[str, str]]
+
+
+@dataclass
+class NPC:
+    seed: int
+    index: int
+    name: str
+    species_key: str
+    gender: str
+    pronouns: PronounSet
+    age: int
+    age_label: str
+    location_key: str
+    origin_key: str
+    occupation_key: str
+    archetype_key: str
+    faction_key: str
+    faith_key: str
+    alignment_key: str
+    appearance: str
+    voice: str
+    mannerism: str
+    personality: list[str]
+    ideal: str
+    bond: str
+    flaw: str
+    upbringing: str
+    turning_point: str
+    life_event: str
+    goal: str
+    obstacle: str
+    secret: str
+    rumor: str
+    rumor_true: bool
+    inventory: list[str]
+    coin: str
+    keepsake: str
+    magic_item: str | None
+    stat_block: StatBlock
+
+
+def weighted_choice(rng: random.Random, weights: Mapping[str, float]) -> str:
+    usable = [(key, max(0.0, float(weight))) for key, weight in weights.items() if float(weight) > 0]
+    if not usable:
+        raise ValueError("No positive weights were available")
+    keys, values = zip(*usable)
+    return rng.choices(keys, weights=values, k=1)[0]
+
+
+def multiply_weights(base: Mapping[str, float], multipliers: Mapping[str, float]) -> dict[str, float]:
+    all_multiplier = multipliers.get("all", 1.0)
+    return {
+        key: weight * all_multiplier * multipliers.get(key, 1.0)
+        for key, weight in base.items()
+    }
+
+
+def modifier(score: int) -> int:
+    return (score - 10) // 2
+
+
+def signed(number: int) -> str:
+    return f"{number:+d}"
+
+
+def article_for(text: str) -> str:
+    return "an" if text[:1].lower() in "aeiou" else "a"
+
+
+def possessive_name(name: str) -> str:
+    return f"{name}'" if name.endswith("s") else f"{name}'s"
+
+
+def natural_join(items: Iterable[str]) -> str:
+    values = list(items)
+    if not values:
+        return ""
+    if len(values) == 1:
+        return values[0]
+    if len(values) == 2:
+        return f"{values[0]} and {values[1]}"
+    return f"{', '.join(values[:-1])}, and {values[-1]}"
+
+
+def display_compound_name(value: str) -> str:
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", value)
+
+
+def choose_name(
+    rng: random.Random,
+    species_key: str,
+    gender: str,
+    used_names: set[str],
+) -> str:
+    species = SPECIES[species_key]
+    for _ in range(100):
+        profile_key = rng.choice(species.name_profiles)
+        pool = NAME_POOLS[profile_key]
+        if gender == "woman":
+            given_pool = pool["feminine"] + (pool["neutral"] if rng.random() < 0.12 else [])
+        elif gender == "man":
+            given_pool = pool["masculine"] + (pool["neutral"] if rng.random() < 0.12 else [])
+        else:
+            given_pool = pool["neutral"] + pool["feminine"] + pool["masculine"]
+        given = rng.choice(given_pool)
+        if rng.random() < 0.32:
+            surname = rng.choice(pool["prefixes"]) + rng.choice(pool["suffixes"])
+        else:
+            surname = display_compound_name(rng.choice(pool["surnames"]))
+        name = f"{given} {surname}"
+        if name.casefold() not in used_names:
+            used_names.add(name.casefold())
+            return name
+    suffix = len(used_names) + 1
+    fallback = f"{given} {surname} {suffix}"
+    used_names.add(fallback.casefold())
+    return fallback
+
+
+def choose_gender_and_pronouns(
+    rng: random.Random,
+    locked_gender: str | None,
+    locked_pronouns: str | None,
+) -> tuple[str, PronounSet]:
+    gender = locked_gender or weighted_choice(rng, {"woman": 47, "man": 47, "nonbinary": 6})
+    if locked_pronouns:
+        pronoun_key = locked_pronouns
+    elif gender == "woman":
+        pronoun_key = weighted_choice(rng, {"she-her": 92, "they-them": 8})
+    elif gender == "man":
+        pronoun_key = weighted_choice(rng, {"he-him": 92, "they-them": 8})
+    else:
+        pronoun_key = weighted_choice(rng, {"they-them": 84, "she-her": 8, "he-him": 8})
+    return gender, PronounSet(*PRONOUNS[pronoun_key])
+
+
+def choose_age(rng: random.Random, species_key: str, locked_age: int | None) -> tuple[int, str]:
+    species = SPECIES[species_key]
+    low, high = species.age_range
+    if locked_age is not None:
+        if not low <= locked_age <= high:
+            raise ValueError(
+                f"Age {locked_age} is outside the supported range for {species.name} ({low}-{high})."
+            )
+        age = locked_age
+    else:
+        mode = species.mature_age + (species.old_age - species.mature_age) * 0.28
+        age = round(rng.triangular(low, high, mode))
+    if age < species.mature_age:
+        label = "young adult"
+    elif age < species.old_age:
+        label = "adult"
+    else:
+        label = "elder"
+    return age, label
+
+
+def choose_location(rng: random.Random, locked: str | None) -> str:
+    return locked or weighted_choice(rng, LOCATION_WEIGHTS)
+
+
+def choose_origin(rng: random.Random, current: str, locked: str | None) -> str:
+    if locked:
+        return locked
+    weights = dict(LOCATION_WEIGHTS)
+    weights[current] *= 1.8
+    return weighted_choice(rng, weights)
+
+
+def choose_species(rng: random.Random, location_key: str, locked: str | None) -> str:
+    if locked:
+        return locked
+    location = LOCATIONS[location_key]
+    return weighted_choice(rng, multiply_weights(SPECIES_WEIGHTS, location.species_bias))
+
+
+def choose_occupation(rng: random.Random, location_key: str, locked: str | None) -> str:
+    if locked:
+        return locked
+    location = LOCATIONS[location_key]
+    category = weighted_choice(rng, multiply_weights(CATEGORY_WEIGHTS, location.category_bias))
+    candidates = {
+        key: occupation.weight
+        for key, occupation in OCCUPATIONS.items()
+        if occupation.category == category
+    }
+    return weighted_choice(rng, candidates)
+
+
+def choose_faction(rng: random.Random, location_key: str, locked: str | None) -> str:
+    if locked:
+        return locked
+    return weighted_choice(
+        rng,
+        multiply_weights(FACTION_WEIGHTS, LOCATIONS[location_key].faction_bias),
+    )
+
+
+def choose_faith(rng: random.Random, occupation_key: str, species_key: str, locked: str | None) -> str:
+    if locked:
+        return locked
+    occupation = OCCUPATIONS[occupation_key]
+    weights = multiply_weights(FAITH_WEIGHTS, FAITH_CATEGORY_BIAS.get(occupation.category, {}))
+    if species_key == "dwarf":
+        weights["moradin"] *= 8
+    elif species_key in {"elf", "half-elf"}:
+        weights["corellon"] *= 5 if species_key == "elf" else 2
+    elif species_key == "halfling":
+        weights["yondalla"] *= 8
+    elif species_key in {"orc", "half-orc"}:
+        weights["gruumsh"] *= 5 if species_key == "orc" else 2
+    return weighted_choice(rng, weights)
+
+
+def choose_cr(
+    rng: random.Random,
+    exact: str | None,
+    minimum: str,
+    maximum: str,
+    occupation_key: str,
+) -> str:
+    if exact:
+        return exact
+    minimum_index = CR_ORDER.index(minimum)
+    maximum_index = CR_ORDER.index(maximum)
+    if minimum_index > maximum_index:
+        raise ValueError("--min-cr cannot be greater than --max-cr")
+    archetypes = set(OCCUPATIONS[occupation_key].archetypes)
+    soft_cap = None
+    if archetypes == {"civilian"}:
+        soft_cap = CR_ORDER.index("1/4")
+    elif archetypes <= {"civilian", "expert"}:
+        soft_cap = CR_ORDER.index("1")
+    if soft_cap is not None and minimum_index <= soft_cap < maximum_index:
+        maximum_index = soft_cap
+    choices = {cr: CR_WEIGHTS[cr] for cr in CR_ORDER[minimum_index : maximum_index + 1]}
+    return weighted_choice(rng, choices)
+
+
+def choose_archetype(
+    rng: random.Random,
+    occupation_key: str,
+    cr: str,
+    locked: str | None,
+) -> str:
+    if locked:
+        return locked
+    candidates = list(OCCUPATIONS[occupation_key].archetypes)
+    if cr == "0" and "civilian" in candidates:
+        return "civilian" if rng.random() < 0.82 else rng.choice(candidates)
+    if cr in {"3", "4", "5"} and "leader" in candidates and rng.random() < 0.5:
+        return "leader"
+    return rng.choice(candidates)
+
+
+def proficiency_bonus(cr: str) -> int:
+    return 3 if cr == "5" else 2
+
+
+def build_abilities(rng: random.Random, archetype_key: str, cr: str) -> dict[str, int]:
+    archetype = ARCHETYPES[archetype_key]
+    scores = dict(zip(ABILITY_KEYS, archetype["scores"]))
+    tier_boost = {
+        "0": 0, "1/8": 0, "1/4": 1, "1/2": 2, "1": 3,
+        "2": 4, "3": 5, "4": 6, "5": 7,
+    }[cr]
+    primary = archetype["primary"]
+    combat_abilities = {archetype["melee"][3]}
+    if archetype["ranged"]:
+        combat_abilities.add(archetype["ranged"][3])
+    scores[primary] = min(20, scores[primary] + tier_boost)
+    for ability in combat_abilities:
+        if ability != primary:
+            scores[ability] = min(20, scores[ability] + tier_boost)
+    required_modifier = CR_TARGET_ATTACK_BONUS[cr] - proficiency_bonus(cr)
+    required_score = 10 + 2 * required_modifier
+    for ability in combat_abilities:
+        scores[ability] = max(scores[ability], required_score)
+    scores["con"] = min(18, scores["con"] + tier_boost // 2)
+    # A little variation without breaking the intended role.
+    variable = [key for key in ABILITY_KEYS if key not in combat_abilities and key != primary]
+    if variable and rng.random() < 0.65:
+        key = rng.choice(variable)
+        scores[key] = max(8, min(18, scores[key] + rng.choice((-1, 1))))
+    return scores
+
+
+def armor_for(archetype_key: str, cr: str, dex_mod: int) -> tuple[int, str, list[str]]:
+    armor = ARCHETYPES[archetype_key]["armor"]
+    high_tier = CR_ORDER.index(cr) >= CR_ORDER.index("3")
+    if armor == "none":
+        return 10 + dex_mod, "", []
+    if armor == "leather":
+        if high_tier:
+            return 12 + dex_mod, "Studded Leather Armor", ["Studded Leather Armor"]
+        return 11 + dex_mod, "Leather Armor", ["Leather Armor"]
+    if armor == "hide":
+        if high_tier:
+            return 17, "Splint Armor", ["Splint Armor"]
+        return 12 + min(2, dex_mod), "Hide Armor", ["Hide Armor"]
+    if armor == "chain-shirt":
+        return 13 + min(2, dex_mod), "Chain Shirt", ["Chain Shirt"]
+    if armor == "chain-shirt-shield":
+        if high_tier:
+            return 16 + min(2, dex_mod), "Breastplate, Shield", ["Breastplate", "Shield"]
+        return 15 + min(2, dex_mod), "Chain Shirt, Shield", ["Chain Shirt", "Shield"]
+    if armor == "breastplate":
+        if high_tier:
+            return 18, "Plate Armor", ["Plate Armor"]
+        return 14 + min(2, dex_mod), "Breastplate", ["Breastplate"]
+    if armor == "mage-armor":
+        return 13 + dex_mod, "Mage Armor", []
+    raise ValueError(f"Unknown armor profile: {armor}")
+
+
+def occupation_skill(category: str) -> str:
+    return {
+        "rural": "Animal Handling",
+        "craft": "Investigation",
+        "service": "Insight",
+        "trade": "Persuasion",
+        "transport": "Survival",
+        "maritime": "Athletics",
+        "civic": "History",
+        "military": "Athletics",
+        "wilderness": "Survival",
+        "religious": "Religion",
+        "arcane": "Arcana",
+        "criminal": "Stealth",
+    }[category]
+
+
+def dice_expression(number: int, sides: int, bonus: int = 0) -> str:
+    expression = f"{number}d{sides}"
+    if bonus > 0:
+        expression += f" + {bonus}"
+    elif bonus < 0:
+        expression += f" - {abs(bonus)}"
+    return expression
+
+
+def average_roll(number: int, sides: int, bonus: int = 0) -> int:
+    return math.floor(number * (sides + 1) / 2 + bonus)
+
+
+def dice_count_nearest_target(sides: int, bonus: int, target: int) -> int:
+    """Choose 1-6 dice whose average is closest to a target damage value."""
+    return min(
+        range(1, 7),
+        key=lambda number: (abs(average_roll(number, sides, bonus) - target), number),
+    )
+
+
+def build_attack(
+    label: str,
+    number: int,
+    sides: int,
+    damage_type: str,
+    ability_key: str,
+    abilities: Mapping[str, int],
+    pb: int,
+    mode: str,
+    range_text: str | None = None,
+) -> tuple[str, str]:
+    ability_mod = modifier(abilities[ability_key])
+    attack_bonus = ability_mod + pb
+    average = average_roll(number, sides, ability_mod)
+    dice = dice_expression(number, sides, ability_mod)
+    if mode == "both":
+        opening = f"Melee or Ranged Attack Roll: {signed(attack_bonus)}, reach 5 ft. or range {range_text}."
+    elif mode == "ranged":
+        opening = f"Ranged Attack Roll: {signed(attack_bonus)}, range {range_text}."
+    else:
+        opening = f"Melee Attack Roll: {signed(attack_bonus)}, reach 5 ft."
+    return label, f"{opening} Hit: {average} ({dice}) {damage_type} damage."
+
+
+def build_spell_features(
+    archetype_key: str,
+    cr: str,
+    abilities: Mapping[str, int],
+    pb: int,
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
+    actions: list[tuple[str, str]] = []
+    bonus_actions: list[tuple[str, str]] = []
+    reactions: list[tuple[str, str]] = []
+    cr_index = CR_ORDER.index(cr)
+    if archetype_key == "arcanist":
+        ability = "int"
+        dc = 8 + pb + modifier(abilities[ability])
+        spell_attack = pb + modifier(abilities[ability])
+        lines = ["At Will: Detect Magic, Light, Mage Hand, Prestidigitation"]
+        if cr_index >= CR_ORDER.index("1/2"):
+            lines.append("1/Day Each: Magic Missile, Sleep")
+        if cr_index >= CR_ORDER.index("2"):
+            lines.append("1/Day Each: Invisibility, Web")
+        if cr_index >= CR_ORDER.index("3"):
+            lines.append("1/Day: Shatter (level 3 version)")
+        if cr_index >= CR_ORDER.index("4"):
+            lines.append("1/Day: Fireball")
+        if cr_index >= CR_ORDER.index("5"):
+            lines.append("1/Day: Fly")
+        actions.append((
+            "Spellcasting",
+            "The arcanist casts one of the following spells, using Intelligence as the "
+            f"spellcasting ability (spell save DC {dc}, {signed(spell_attack)} to hit with spell attacks): "
+            + "; ".join(lines) + ".",
+        ))
+        if cr_index >= CR_ORDER.index("3"):
+            bonus_actions.append(("Misty Step (2/Day)", "The arcanist casts Misty Step."))
+        if cr_index >= CR_ORDER.index("5"):
+            reactions.append(("Protective Magic (2/Day)", "The arcanist casts Shield in response to the spell's trigger."))
+    elif archetype_key == "devotee":
+        ability = "wis"
+        dc = 8 + pb + modifier(abilities[ability])
+        lines = ["At Will: Light, Thaumaturgy"]
+        if cr_index >= CR_ORDER.index("1"):
+            lines.append("1/Day: Sanctuary")
+        if cr_index >= CR_ORDER.index("3"):
+            lines.append("1/Day: Spirit Guardians")
+        actions.append((
+            "Spellcasting",
+            "The devotee casts one of the following spells, using Wisdom as the "
+            f"spellcasting ability (spell save DC {dc}): " + "; ".join(lines) + ".",
+        ))
+        uses = 1 if cr_index < CR_ORDER.index("2") else 2 if cr_index < CR_ORDER.index("4") else 3
+        aid_spells = "Bless, Healing Word, or Sanctuary"
+        if cr_index >= CR_ORDER.index("3"):
+            aid_spells = "Bless, Dispel Magic, Healing Word, or Lesser Restoration"
+        bonus_actions.append((
+            f"Divine Aid ({uses}/Day)",
+            f"The devotee casts {aid_spells}, using the same spellcasting ability as Spellcasting.",
+        ))
+    return actions, bonus_actions, reactions
+
+
+def build_stat_block(
+    rng: random.Random,
+    species_key: str,
+    alignment_key: str,
+    occupation_key: str,
+    archetype_key: str,
+    faith_key: str,
+    cr: str,
+) -> StatBlock:
+    species = SPECIES[species_key]
+    archetype = ARCHETYPES[archetype_key]
+    occupation = OCCUPATIONS[occupation_key]
+    pb = proficiency_bonus(cr)
+    abilities = build_abilities(rng, archetype_key, cr)
+    dex_mod = modifier(abilities["dex"])
+    ac, armor_note, gear = armor_for(archetype_key, cr, dex_mod)
+
+    hit_die_size = 6 if species.size == "Small" else 8
+    number_of_hit_dice = CR_PROFILES[cr]["hit_dice"]
+    con_mod = modifier(abilities["con"])
+    hp = max(1, average_roll(number_of_hit_dice, hit_die_size, con_mod * number_of_hit_dice))
+    hit_dice = dice_expression(number_of_hit_dice, hit_die_size, con_mod * number_of_hit_dice)
+
+    initiative_mod = dex_mod + (pb if archetype["initiative"] else 0)
+    initiative_score = 10 + initiative_mod
+
+    saves = {key: modifier(score) for key, score in abilities.items()}
+    for key in archetype["saves"]:
+        saves[key] += pb
+
+    skill_names = list(archetype["skills"])
+    work_skill = occupation_skill(occupation.category)
+    if work_skill not in skill_names:
+        skill_names.append(work_skill)
+    skills = {}
+    for skill in skill_names:
+        value = modifier(abilities[SKILL_ABILITIES[skill]]) + pb
+        if skill in archetype["expertise"]:
+            value += pb
+        skills[skill] = value
+
+    passive_perception = 10 + skills.get("Perception", modifier(abilities["wis"]))
+    senses_parts = []
+    if species.darkvision:
+        senses_parts.append("Darkvision 60 ft.")
+    senses_parts.append(f"Passive Perception {passive_perception}")
+
+    languages = ["Common"]
+    if species.language and species.language not in languages:
+        languages.append(species.language)
+    if occupation.category in {"trade", "transport", "civic", "arcane"} and rng.random() < 0.5:
+        choices = ["Dwarvish", "Elvish", "Giant", "Gnomish", "Goblin", "Halfling", "Orc"]
+        extra = rng.choice([item for item in choices if item not in languages])
+        languages.append(extra)
+    if archetype_key == "outlaw":
+        languages.append("Thieves' Cant")
+
+    melee = archetype["melee"]
+    ranged = archetype["ranged"]
+    attacks = CR_PROFILES[cr]["attacks"]
+    action_entries: list[tuple[str, str]] = []
+    traits: list[tuple[str, str]] = []
+    bonus_actions: list[tuple[str, str]] = []
+    reactions: list[tuple[str, str]] = []
+
+    if attacks > 1:
+        options = [melee[0]]
+        if ranged and ranged[0] != melee[0]:
+            options.append(ranged[0])
+        attack_word = NUMBER_WORDS.get(attacks, str(attacks))
+        if len(options) == 1:
+            multiattack_text = f"The NPC makes {attack_word} {options[0]} attacks."
+        else:
+            multiattack_text = (
+                f"The NPC makes {attack_word} attacks, using {natural_join(options)} in any combination."
+            )
+        action_entries.append(("Multiattack", multiattack_text))
+
+    target_damage = CR_TARGET_DAMAGE_PER_HIT[cr]
+    melee_dice = dice_count_nearest_target(
+        melee[1], modifier(abilities[melee[3]]), target_damage
+    )
+    ranged_dice = None
+    if ranged:
+        ranged_dice = dice_count_nearest_target(
+            ranged[1], modifier(abilities[ranged[3]]), target_damage
+        )
+
+    if ranged and ranged[0] == melee[0] and ranged[2] == melee[2] and ranged[3] == melee[3]:
+        action_entries.append(build_attack(
+            melee[0], melee_dice, melee[1], melee[2], melee[3], abilities, pb, "both", ranged[4]
+        ))
+    else:
+        action_entries.append(build_attack(
+            melee[0], melee_dice, melee[1], melee[2], melee[3], abilities, pb, "melee"
+        ))
+        if ranged:
+            action_entries.append(build_attack(
+                ranged[0], ranged_dice, ranged[1], ranged[2], ranged[3], abilities, pb, "ranged", ranged[4]
+            ))
+
+    spell_actions, spell_bonus, spell_reactions = build_spell_features(archetype_key, cr, abilities, pb)
+    action_entries.extend(spell_actions)
+    bonus_actions.extend(spell_bonus)
+    reactions.extend(spell_reactions)
+
+    if archetype_key == "civilian":
+        traits.append((
+            "Training",
+            f"The NPC has proficiency in {work_skill} and has Advantage whenever it makes an ability check using that skill.",
+        ))
+    elif archetype_key == "scout":
+        traits.append((
+            "Trailwise",
+            "The scout has Advantage on Wisdom (Survival) checks made to navigate or follow tracks.",
+        ))
+        bonus_actions.append(("Quick Step", "The scout takes the Dash, Disengage, or Hide action."))
+    elif archetype_key == "outlaw":
+        bonus_actions.append(("Cunning Action", "The outlaw takes the Dash, Disengage, or Hide action."))
+    elif archetype_key == "warrior":
+        traits.append((
+            "Bloodied Resolve",
+            "While Bloodied, the warrior has Advantage on Strength and Constitution saving throws.",
+        ))
+    elif archetype_key in {"guard", "leader"}:
+        reactions.append((
+            "Parry",
+            f"Trigger: The NPC is hit by a melee attack roll while holding a weapon. Response: The NPC adds {pb} to its AC against that attack, possibly causing it to miss.",
+        ))
+
+    # Recoverable combat gear.  Magic-like attack manifestations are not items.
+    if archetype_key == "arcanist":
+        gear.append("Wand")
+    elif archetype_key == "devotee":
+        gear.extend(["Holy Symbol", "Mace"])
+    else:
+        melee_gear = melee[0]
+        if melee_gear not in gear:
+            gear.append("Spears (3)" if melee_gear == "Spear" else melee_gear)
+        if ranged and ranged[0] != melee[0] and ranged[0] not in {"Radiant Flame", "Arcane Burst"}:
+            ranged_gear = ranged[0]
+            if ranged_gear not in gear:
+                gear.append(ranged_gear)
+
+    return StatBlock(
+        size=species.size,
+        alignment=ALIGNMENTS[alignment_key],
+        armor_class=ac,
+        armor_note=armor_note,
+        initiative_mod=initiative_mod,
+        initiative_score=initiative_score,
+        hit_points=hp,
+        hit_dice=hit_dice,
+        speed="30 ft.",
+        abilities=abilities,
+        saves=saves,
+        skills=skills,
+        gear=gear,
+        senses="; ".join(senses_parts),
+        languages=languages,
+        cr=cr,
+        xp=CR_XP[cr],
+        proficiency_bonus=pb,
+        traits=traits,
+        actions=action_entries,
+        bonus_actions=bonus_actions,
+        reactions=reactions,
+    )
+
+
+def choose_magic_item(rng: random.Random, mode: str) -> str | None:
+    if mode == "none":
+        return None
+    if mode == "minor":
+        return rng.choice(MINOR_WONDERS)
+    if mode == "common":
+        return rng.choice(COMMON_MAGIC_ITEMS)
+    if mode == "uncommon":
+        return rng.choice(UNCOMMON_MAGIC_ITEMS)
+    roll = rng.random()
+    if roll < 0.003:
+        return rng.choice(UNCOMMON_MAGIC_ITEMS)
+    if roll < 0.018:
+        return rng.choice(COMMON_MAGIC_ITEMS)
+    if roll < 0.06:
+        return rng.choice(MINOR_WONDERS)
+    return None
+
+
+def choose_coin(rng: random.Random, occupation_key: str) -> str:
+    category = OCCUPATIONS[occupation_key].category
+    tier = {
+        "rural": 0, "service": 0, "wilderness": 0,
+        "craft": 1, "transport": 1, "maritime": 1, "military": 1, "religious": 1,
+        "trade": 2, "civic": 2, "arcane": 2, "criminal": 1,
+    }[category]
+    cp = rng.randint(0, 11)
+    sp = rng.randint(1, 12 + 8 * tier)
+    gp = rng.randint(0, 2 + 5 * tier)
+    parts = []
+    if gp:
+        parts.append(f"{gp} gp")
+    if sp:
+        parts.append(f"{sp} sp")
+    if cp:
+        parts.append(f"{cp} cp")
+    return natural_join(parts)
+
+
+def build_inventory(
+    rng: random.Random,
+    occupation_key: str,
+    stat_block: StatBlock,
+    magic_mode: str,
+) -> tuple[list[str], str, str, str | None]:
+    occupation = OCCUPATIONS[occupation_key]
+    inventory = [f"Combat gear: {', '.join(stat_block.gear)}"]
+    inventory.append(f"Work gear: {occupation.tool_or_wares}")
+    for item in rng.sample(GENERAL_ITEMS, k=rng.randint(2, 4)):
+        inventory.append(item)
+    keepsake = rng.choice(KEEPSAKES)
+    magic_item = choose_magic_item(rng, magic_mode)
+    return inventory, choose_coin(rng, occupation_key), keepsake, magic_item
+
+
+def build_appearance(
+    rng: random.Random,
+    species_key: str,
+    age_label: str,
+    pronouns: PronounSet,
+) -> str:
+    species = SPECIES[species_key]
+    extras = []
+    if species_key == "tiefling":
+        extras.append(rng.choice(["backswept horns", "short ridged horns", "one horn repaired with a brass cap"]))
+    elif species_key == "dragonborn":
+        extras.append(rng.choice(["ochre scales", "deep green scales", "umber scales", "bronze-flecked scales", "slate scales"]))
+    elif species_key == "aasimar":
+        extras.append(rng.choice(["a faint metallic sheen in the eyes", "hair that catches light unusually", "an unnervingly calm gaze"]))
+    elif species_key in {"orc", "half-orc"}:
+        extras.append(rng.choice(["small lower tusks", "a prominent lower tusk repaired with silver", "worn-flat tusks"]))
+    elif species_key == "goliath":
+        extras.append(rng.choice(["pale geometric skin markings", "dark mottled markings", "a nearly hairless scalp traced with old tattoos"]))
+    elif species_key == "elf":
+        extras.append("long, tapered ears")
+    elif species_key == "dwarf":
+        extras.append(rng.choice(["a carefully bound beard", "thick side braids", "a clean-shaven jaw unusual among local dwarves"]))
+    elif species_key == "gnome":
+        extras.append("expressive eyebrows")
+    elif species_key == "goblin":
+        extras.append(rng.choice(["wide pointed ears", "a notched right ear", "a copper ring through one ear"]))
+
+    pieces = [
+        f"{article_for(age_label)} {age_label}, {rng.choice(BUILDS)} {species.name.lower()} with a {rng.choice(FACES)} face",
+        f"{rng.choice(HAIR)} hair and {rng.choice(EYES)} eyes",
+    ]
+    if extras:
+        pieces.append(extras[0])
+    return (
+        f"{pronouns.Subject} is {', '.join(pieces)}, with {rng.choice(MARKS)}. "
+        f"{pronouns.Subject} wears {rng.choice(CLOTHING)}."
+    )
+
+
+def generate_npc(
+    rng: random.Random,
+    args: argparse.Namespace,
+    seed: int,
+    index: int,
+    used_names: set[str],
+) -> NPC:
+    location_key = choose_location(rng, args.location)
+    origin_key = choose_origin(rng, location_key, args.origin)
+    species_key = choose_species(rng, location_key, args.species)
+    gender, pronouns = choose_gender_and_pronouns(rng, args.gender, args.pronouns)
+    if args.name and args.count > 1:
+        name = f"{args.name} {index}"
+    elif args.name:
+        name = args.name
+    else:
+        name = choose_name(rng, species_key, gender, used_names)
+    age, age_label = choose_age(rng, species_key, args.age)
+    occupation_key = choose_occupation(rng, location_key, args.occupation)
+    cr = choose_cr(rng, args.cr, args.min_cr, args.max_cr, occupation_key)
+    archetype_key = choose_archetype(rng, occupation_key, cr, args.archetype)
+    faction_key = choose_faction(rng, location_key, args.faction)
+    faith_key = choose_faith(rng, occupation_key, species_key, args.faith)
+    alignment_key = args.alignment or weighted_choice(rng, ALIGNMENT_WEIGHTS)
+
+    stat_block = build_stat_block(
+        rng, species_key, alignment_key, occupation_key, archetype_key, faith_key, cr
+    )
+    inventory, coin, keepsake, magic_item = build_inventory(
+        rng, occupation_key, stat_block, args.magic_item
+    )
+
+    axes = rng.sample(list(PERSONALITY_AXES), k=3)
+    personality = [rng.choice(PERSONALITY_AXES[axis]) for axis in axes]
+    return NPC(
+        seed=seed,
+        index=index,
+        name=name,
+        species_key=species_key,
+        gender=gender,
+        pronouns=pronouns,
+        age=age,
+        age_label=age_label,
+        location_key=location_key,
+        origin_key=origin_key,
+        occupation_key=occupation_key,
+        archetype_key=archetype_key,
+        faction_key=faction_key,
+        faith_key=faith_key,
+        alignment_key=alignment_key,
+        appearance=build_appearance(rng, species_key, age_label, pronouns),
+        voice=rng.choice(VOICES),
+        mannerism=rng.choice(MANNERISMS),
+        personality=personality,
+        ideal=rng.choice(IDEALS),
+        bond=rng.choice(BONDS),
+        flaw=rng.choice(FLAWS),
+        upbringing=rng.choice(UPBRINGINGS),
+        turning_point=rng.choice(TURNING_POINTS),
+        life_event=rng.choice(LIFE_EVENTS),
+        goal=rng.choice(GOALS),
+        obstacle=rng.choice(OBSTACLES),
+        secret=rng.choice(SECRETS),
+        rumor=rng.choice(RUMORS),
+        rumor_true=rng.random() < 0.5,
+        inventory=inventory,
+        coin=coin,
+        keepsake=keepsake,
+        magic_item=magic_item,
+        stat_block=stat_block,
+    )
+
+
+def render_stat_block(npc: NPC, level: int) -> list[str]:
+    block = npc.stat_block
+    species = SPECIES[npc.species_key]
+    heading = "#" * level
+    block_name_heading = "#" * (level + 1)
+    section_heading = "#" * (level + 2)
+    lines = [
+        f"{heading} Stat Block",
+        "",
+        f"{block_name_heading} {npc.name}",
+        "",
+        f"*{block.size} Humanoid ({species.name}), {block.alignment}*",
+        "",
+        f"**AC** {block.armor_class}" + (f" ({block.armor_note})" if block.armor_note else ""),
+        f"**Initiative** {signed(block.initiative_mod)} ({block.initiative_score})",
+        f"**HP** {block.hit_points} ({block.hit_dice})",
+        f"**Speed** {block.speed}",
+        "",
+        "| Ability | Score | Modifier | Save |",
+        "|:--|--:|--:|--:|",
+    ]
+    for key in ABILITY_KEYS:
+        score = block.abilities[key]
+        lines.append(
+            f"| {ABILITY_NAMES[key]} | {score} | {signed(modifier(score))} | {signed(block.saves[key])} |"
+        )
+    lines.extend([""])
+    if block.skills:
+        skill_text = ", ".join(f"{name} {signed(value)}" for name, value in sorted(block.skills.items()))
+        lines.append(f"**Skills** {skill_text}")
+    lines.extend([
+        f"**Gear** {', '.join(block.gear)}",
+        f"**Senses** {block.senses}",
+        f"**Languages** {', '.join(block.languages)}",
+        f"**CR** {block.cr} (XP {block.xp:,}; PB {signed(block.proficiency_bonus)})",
+        "",
+    ])
+    if block.traits:
+        lines.extend([f"{section_heading} Traits", ""])
+        for title, body in block.traits:
+            lines.extend([f"***{title}.*** {body}", ""])
+    lines.extend([f"{section_heading} Actions", ""])
+    for title, body in block.actions:
+        lines.extend([f"***{title}.*** {body}", ""])
+    if block.bonus_actions:
+        lines.extend([f"{section_heading} Bonus Actions", ""])
+        for title, body in block.bonus_actions:
+            lines.extend([f"***{title}.*** {body}", ""])
+    if block.reactions:
+        lines.extend([f"{section_heading} Reactions", ""])
+        for title, body in block.reactions:
+            lines.extend([f"***{title}.*** {body}", ""])
+    return lines
+
+
+def render_npc(npc: NPC, top_level: int = 1) -> str:
+    h1 = "#" * top_level
+    h2 = "#" * (top_level + 1)
+    species = SPECIES[npc.species_key]
+    occupation = OCCUPATIONS[npc.occupation_key]
+    location = LOCATIONS[npc.location_key]
+    origin = LOCATIONS[npc.origin_key]
+    faction_name, faction_note = FACTIONS[npc.faction_key]
+    faith_name, faith_note = FAITHS[npc.faith_key]
+    pronouns = npc.pronouns
+    article = article_for(occupation.name)
+
+    lines = [
+        f"<!-- Generated by scripts/create-npc v{VERSION}; seed {npc.seed}; NPC {npc.index}. -->",
+        f"{h1} {npc.name}",
+        "",
+        f"> {article.capitalize()} {occupation.name.lower()} in {location.name}; {', '.join(npc.personality[:2])}.",
+        "",
+        f"{h2} At a Glance",
+        "",
+        "| Field | Detail |",
+        "|:--|:--|",
+        f"| Species | {species.name} |",
+        f"| Age | {npc.age} ({npc.age_label}) |",
+        f"| Gender and pronouns | {npc.gender.capitalize()}; {pronouns.label} |",
+        f"| Occupation | {occupation.name} |",
+        f"| Current location | {location.name} — {location.blurb} |",
+        f"| Origin | {origin.name} |",
+        f"| Faith | {faith_name} — {faith_note} |",
+        f"| Affiliation | {faction_name} — {faction_note} |",
+        f"| Alignment | {ALIGNMENTS[npc.alignment_key]} |",
+        f"| Combat profile | {ARCHETYPES[npc.archetype_key]['name']}, CR {npc.stat_block.cr} |",
+        "",
+        f"{h2} Appearance and Manner",
+        "",
+        npc.appearance,
+        "",
+        f"{pronouns.Subject} speaks in {npc.voice} and {npc.mannerism}.",
+        "",
+        f"{h2} Personality",
+        "",
+        f"- **First impression:** {natural_join(npc.personality).capitalize()}.",
+        f"- **Ideal:** {npc.ideal}",
+        f"- **Bond:** {pronouns.Subject} {npc.bond}.",
+        f"- **Flaw:** {pronouns.Subject} {npc.flaw}.",
+        "",
+        f"{h2} History",
+        "",
+        f"{npc.name} was raised {npc.upbringing} near {origin.name}. {pronouns.Subject} entered work as {article} {occupation.name.lower()} after {npc.turning_point}.",
+        "",
+        f"A defining episode came when {pronouns.subject} {npc.life_event}. The experience reinforced {possessive_name(npc.name)} belief that “{npc.ideal}”",
+        "",
+    ]
+    if npc.faith_key == "none":
+        faith_clause = "observes common local rites without claiming a single patron"
+    else:
+        faith_clause = f"openly honors {faith_name}"
+    if npc.faction_key == "none":
+        lines.append(
+            f"Now based around {location.name}, {pronouns.subject} keeps {pronouns.possessive_adjective} loyalties local and avoids formal faction politics. {pronouns.Subject} {faith_clause}."
+        )
+    else:
+        lines.append(
+            f"Now based around {location.name}, {pronouns.subject} is connected to {faction_name}: {faction_note}. {pronouns.Subject} {faith_clause}."
+        )
+    lines.extend([
+        "",
+        f"{h2} Wants, Knowledge, and Hooks",
+        "",
+        f"- **Immediate goal:** {npc.goal.capitalize()}.",
+        f"- **Complication:** {npc.obstacle.capitalize()}.",
+        f"- **Private truth:** {pronouns.Subject} {npc.secret}.",
+        f"- **Local rumor ({'true' if npc.rumor_true else 'false'}):** {npc.rumor}",
+        f"- **Possible hook:** {npc.name} needs discreet help to {npc.goal}, but {npc.obstacle}.",
+        f"- **Possible connection:** Evidence tied to {pronouns.possessive_adjective} private truth has surfaced near {location.name}.",
+        "",
+        f"{h2} On Their Person",
+        "",
+    ])
+    for item in npc.inventory:
+        lines.append(f"- {item}")
+    lines.extend([
+        f"- Coin purse: {npc.coin}",
+        f"- Keepsake: {npc.keepsake}",
+    ])
+    if npc.magic_item:
+        lines.append(f"- Unusual or magical item: {npc.magic_item} (not included in the NPC's CR calculation)")
+    lines.extend([""])
+    lines.extend(render_stat_block(npc, top_level + 1))
+    return "\n".join(lines).rstrip()
+
+
+def rules_attribution(seed: int) -> str:
+    return (
+        f"<sub>Generation seed: `{seed}`. This work includes material from the System Reference "
+        "Document 5.2 (\"SRD 5.2\") by Wizards of the Coast LLC, available at "
+        "[D&D Beyond](https://www.dndbeyond.com/srd). The SRD 5.2 is licensed under the "
+        "[Creative Commons Attribution 4.0 International License]"
+        "(https://creativecommons.org/licenses/by/4.0/legalcode).</sub>"
+    )
+
+
+def render_document(npcs: list[NPC], seed: int) -> str:
+    if len(npcs) == 1:
+        body = render_npc(npcs[0], top_level=1)
+    else:
+        parts = [f"# Generated Sword Coast NPCs", ""]
+        for index, npc in enumerate(npcs):
+            if index:
+                parts.extend(["", "---", ""])
+            parts.append(render_npc(npc, top_level=2))
+        body = "\n".join(parts)
+    return f"{body}\n\n---\n\n{rules_attribution(seed)}\n"
+
+
+def format_option_lines(label: str, values: Iterable[str]) -> str:
+    prefix = f"  {label}: "
+    subsequent = " " * len(prefix)
+    return textwrap.fill(
+        ", ".join(values),
+        width=100,
+        initial_indent=prefix,
+        subsequent_indent=subsequent,
+        break_long_words=False,
+        break_on_hyphens=False,
+    )
+
+
+def build_epilog() -> str:
+    sections = [
+        "LOCK-IN VALUES",
+        format_option_lines("species", SPECIES),
+        format_option_lines("gender", GENDERS),
+        format_option_lines("pronouns", PRONOUNS),
+        format_option_lines("location/origin", LOCATIONS),
+        format_option_lines("occupation", OCCUPATIONS),
+        format_option_lines("archetype", ARCHETYPES),
+        format_option_lines("faction", FACTIONS),
+        format_option_lines("faith", FAITHS),
+        format_option_lines("alignment", ALIGNMENTS),
+        format_option_lines("cr/min-cr/max-cr", CR_ORDER),
+        format_option_lines("magic-item", ("auto", "none", "minor", "common", "uncommon")),
+        "",
+        "EXAMPLES",
+        "  python scripts/create-npc",
+        "  python scripts/create-npc --seed 1499 --location phandalin --occupation blacksmith",
+        "  python scripts/create-npc --species dwarf --cr 3 --faction harpers --output npc.md",
+        "  python scripts/create-npc --count 5 --min-cr 0 --max-cr 1 --output townsfolk.md",
+    ]
+    return "\n".join(sections)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="create-npc",
+        description=(
+            "Generate grounded, campaign-ready Sword Coast NPCs as Markdown. With no arguments, "
+            "every field is randomized and the seed is printed in the document."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=build_epilog(),
+    )
+    identity = parser.add_argument_group("identity lock-ins")
+    identity.add_argument("--name", help="use this exact name (batch output appends an index)")
+    identity.add_argument("--species", choices=SPECIES, metavar="VALUE")
+    identity.add_argument("--gender", choices=GENDERS, metavar="VALUE")
+    identity.add_argument("--pronouns", choices=PRONOUNS, metavar="VALUE")
+    identity.add_argument("--age", type=int, help="lock age; valid range depends on species")
+
+    story = parser.add_argument_group("setting and story lock-ins")
+    story.add_argument("--location", choices=LOCATIONS, metavar="VALUE", help="current location")
+    story.add_argument("--origin", choices=LOCATIONS, metavar="VALUE", help="place of origin")
+    story.add_argument("--occupation", choices=OCCUPATIONS, metavar="VALUE")
+    story.add_argument("--faction", choices=FACTIONS, metavar="VALUE")
+    story.add_argument("--faith", choices=FAITHS, metavar="VALUE")
+    story.add_argument("--alignment", choices=ALIGNMENTS, metavar="VALUE")
+
+    mechanics = parser.add_argument_group("mechanical lock-ins")
+    mechanics.add_argument("--archetype", choices=ARCHETYPES, metavar="VALUE")
+    mechanics.add_argument("--cr", choices=CR_ORDER, metavar="VALUE", help="exact challenge rating")
+    mechanics.add_argument("--min-cr", choices=CR_ORDER, default="0", metavar="VALUE")
+    mechanics.add_argument("--max-cr", choices=CR_ORDER, default="5", metavar="VALUE")
+    mechanics.add_argument(
+        "--magic-item",
+        choices=("auto", "none", "minor", "common", "uncommon"),
+        default="auto",
+        metavar="VALUE",
+        help="lock the magic-item tier; auto makes true magic rare",
+    )
+
+    output = parser.add_argument_group("randomization and output")
+    output.add_argument("--seed", type=int, help="integer seed for reproducible output")
+    output.add_argument("--count", type=int, default=1, help="number of NPCs to generate (1-100)")
+    output.add_argument("--output", type=Path, help="write UTF-8 Markdown to this file instead of stdout")
+    output.add_argument("--force", action="store_true", help="allow --output to replace an existing file")
+    output.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
+    return parser
+
+
+def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if not 1 <= args.count <= 100:
+        parser.error("--count must be between 1 and 100")
+    if CR_ORDER.index(args.min_cr) > CR_ORDER.index(args.max_cr):
+        parser.error("--min-cr cannot be greater than --max-cr")
+    if args.cr:
+        if CR_ORDER.index(args.cr) < CR_ORDER.index(args.min_cr):
+            parser.error("--cr cannot be lower than --min-cr")
+        if CR_ORDER.index(args.cr) > CR_ORDER.index(args.max_cr):
+            parser.error("--cr cannot be higher than --max-cr")
+    if args.age is not None and args.age < 1:
+        parser.error("--age must be a positive integer")
+    if args.output and args.output.exists() and not args.force:
+        parser.error(f"output file already exists: {args.output} (use --force to replace it)")
+
+
+def write_output(markdown: str, destination: Path | None) -> None:
+    if destination is None:
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
+        print(markdown, end="")
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(markdown, encoding="utf-8", newline="\n")
+    print(f"Wrote {destination}", file=sys.stderr)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    validate_args(parser, args)
+    seed = args.seed if args.seed is not None else secrets.randbits(63)
+    rng = random.Random(seed)
+    used_names: set[str] = set()
+    try:
+        npcs = [
+            generate_npc(rng, args, seed, index, used_names)
+            for index in range(1, args.count + 1)
+        ]
+    except ValueError as error:
+        parser.error(str(error))
+    markdown = render_document(npcs, seed)
+    write_output(markdown, args.output)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
