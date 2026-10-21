@@ -19,7 +19,7 @@ jobs:
           bundler-cache: true
 
       - name: Set up Chrome
-        uses: browser-actions/setup-chrome@v1
+        uses: browser-actions/setup-chrome@v2
 
       - name: Build Tailwind CSS
         run: bin/rails tailwindcss:build
