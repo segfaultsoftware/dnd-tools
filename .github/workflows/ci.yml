@@ -3,56 +3,65 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [ main ]
 
 jobs:
-  scan_ruby:
+  test:
+    name: RSpec
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/dnd_tools_test
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: dnd_tools_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d dnd_tools_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-      - name: Checkout code
+      - name: Check out code
         uses: actions/checkout@v6
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
+          ruby-version: .ruby-version
           bundler-cache: true
 
-      - name: Scan for common Rails security vulnerabilities using static analysis
-        run: bin/brakeman --no-pager
-      
-      - name: Scan for known security vulnerabilities in gems used
-        run: bin/bundler-audit
-      
-  scan_js:
-    runs-on: ubuntu-latest
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+      - name: Prepare test database
+        run: bin/rails db:prepare
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
+      - name: Run RSpec
+        run: bundle exec rspec
 
-      - name: Scan for security vulnerabilities in JavaScript dependencies
-        run: bin/importmap audit
-
-  lint:
+  quality:
+    name: Quality and security
     runs-on: ubuntu-latest
     env:
       RUBOCOP_CACHE_ROOT: tmp/rubocop
+
     steps:
-      - name: Checkout code
+      - name: Check out code
         uses: actions/checkout@v6
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
+          ruby-version: .ruby-version
           bundler-cache: true
 
-      - name: Prepare RuboCop cache
+      - name: Restore RuboCop cache
         uses: actions/cache@v4
         env:
           DEPENDENCIES_HASH: ${{ hashFiles('.ruby-version', '**/.rubocop.yml', '**/.rubocop_todo.yml', 'Gemfile.lock') }}
@@ -62,6 +71,11 @@ jobs:
           restore-keys: |
             rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
 
-      - name: Lint code for consistent style
+      - name: Run RuboCop
         run: bin/rubocop -f github
 
+      - name: Run Brakeman
+        run: bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error
+
+      - name: Audit Ruby dependencies
+        run: bin/bundler-audit
