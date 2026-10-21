@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root_dir"
+
+compose=(docker compose --env-file .env.deploy -f compose.yaml)
+
+case "${1:-}" in
+  validate)
+    script/check-deployment-config
+    "${compose[@]}" config --quiet
+    ;;
+  deploy|update)
+    "${compose[@]}" up --build --detach --wait
+    ;;
+  restart)
+    "${compose[@]}" restart
+    "${compose[@]}" ps
+    ;;
+  status)
+    "${compose[@]}" ps
+    ;;
+  logs)
+    "${compose[@]}" logs --tail "${2:-200}"
+    ;;
+  health)
+    "${compose[@]}" ps
+    "${compose[@]}" exec --no-TTY web curl --fail --silent --show-error --header 'Host: dnd-tools.home.arpa' http://127.0.0.1/up
+    ;;
+  *)
+    echo "Usage: bin/deploy {validate|deploy|update|restart|status|logs [lines]|health}" >&2
+    exit 64
+    ;;
+esac

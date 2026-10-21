@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "yaml"
+
+root = File.expand_path("..", __dir__)
+compose = YAML.load_file(File.join(root, "compose.yaml"), aliases: true)
+
+def assert!(condition, message)
+  abort("deployment configuration check failed: #{message}") unless condition
+end
+
+services = compose.fetch("services")
+web = services.fetch("web")
+
+assert!(services.keys == [ "web" ], "Compose must define only the web service")
+assert!(!web.key?("ports"), "web must not publish host ports")
+assert!(web.fetch("networks").keys.sort == %w[internal web], "web must join web and internal networks")
+assert!(web.dig("networks", "web", "aliases") == [ "dnd-tools-web" ], "web must use the Caddy alias")
+assert!(compose.dig("networks", "web", "external") == true, "web network must be external")
+assert!(compose.dig("networks", "internal", "internal") == true, "internal network must be private")
+assert!(web.fetch("healthcheck").fetch("test").join(" ").include?("dnd-tools.home.arpa"), "web health check must provide the expected host")
+assert!(web.fetch("volumes").include?("./storage:/rails/storage"), "uploads must persist in the application checkout")
+assert!(compose.fetch("secrets").keys == [ "rails_master_key" ], "required file-backed master key is missing")
+
+production = File.read(File.join(root, "config/environments/production.rb"))
+%w[config.assume_ssl\ =\ true config.force_ssl\ =\ true dnd-tools.home.arpa].each do |setting|
+  assert!(production.include?(setting), "production Rails setting is missing: #{setting}")
+end
+
+database_config = File.read(File.join(root, "config/database.yml"))
+assert!(database_config.include?("adapter: sqlite3"), "production must use SQLite")
+assert!(File.read(File.join(root, ".gitignore")).include?("/.env*"), "deployment environment file must be ignored")
+assert!(File.exist?(File.join(root, "docs/deployment.md")), "operator runbook is missing")
+
+puts "deployment configuration: OK"

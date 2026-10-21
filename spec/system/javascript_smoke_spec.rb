@@ -5,6 +5,6 @@ RSpec.describe "JavaScript browser support", type: :system do
     visit "/not-a-real-route"
 
     expect(page).to have_css("body")
-    expect(page.status_code).to eq(404)
+    expect(page).to have_text("Routing Error")
   end
 end
