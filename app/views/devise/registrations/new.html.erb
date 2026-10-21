@@ -1,0 +1,46 @@
+<% content_for :title, "Create an account" %>
+
+<section class="registration" aria-labelledby="registration-heading">
+  <h1 id="registration-heading">Create an account</h1>
+  <p>Use your email address and a password to get started.</p>
+
+  <% if resource.errors.any? %>
+    <section class="form-errors" aria-labelledby="error-summary-heading" role="alert" tabindex="-1">
+      <h2 id="error-summary-heading">There were problems with your sign-up</h2>
+      <ul>
+        <% resource.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
+  <%= form_with model: resource, as: resource_name, url: registration_path(resource_name), class: "registration-form", html: { novalidate: true } do |form| %>
+    <div class="field">
+      <%= form.label :email %>
+      <%= form.email_field :email, autofocus: true, autocomplete: "email", required: true, aria: { describedby: resource.errors[:email].any? ? "email-error" : nil, invalid: resource.errors[:email].any? } %>
+      <% if resource.errors[:email].any? %>
+        <p id="email-error" class="field-error"><%= resource.errors[:email].first %></p>
+      <% end %>
+    </div>
+
+    <div class="field">
+      <%= form.label :password %>
+      <%= form.password_field :password, autocomplete: "new-password", required: true, aria: { describedby: resource.errors[:password].any? ? "password-error password-hint" : "password-hint", invalid: resource.errors[:password].any? } %>
+      <p id="password-hint" class="field-hint">Use between <%= @minimum_password_length %> and 128 characters.</p>
+      <% if resource.errors[:password].any? %>
+        <p id="password-error" class="field-error"><%= resource.errors[:password].first %></p>
+      <% end %>
+    </div>
+
+    <div class="field">
+      <%= form.label :password_confirmation, "Confirm password" %>
+      <%= form.password_field :password_confirmation, autocomplete: "new-password", required: true, aria: { describedby: resource.errors[:password_confirmation].any? ? "password-confirmation-error" : nil, invalid: resource.errors[:password_confirmation].any? } %>
+      <% if resource.errors[:password_confirmation].any? %>
+        <p id="password-confirmation-error" class="field-error"><%= resource.errors[:password_confirmation].first %></p>
+      <% end %>
+    </div>
+
+    <%= form.submit "Create account" %>
+  <% end %>
+</section>

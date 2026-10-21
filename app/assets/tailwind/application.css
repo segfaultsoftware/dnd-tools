@@ -1,1 +1,72 @@
 @import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-950;
+  }
+
+  :focus-visible {
+    @apply outline-3 outline-offset-3 outline-indigo-700;
+  }
+}
+
+@layer components {
+  .registration,
+  .welcome {
+    @apply mx-auto w-full max-w-xl rounded-lg bg-white p-6 shadow-sm sm:p-8;
+  }
+
+  .registration h1,
+  .welcome h1 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .registration > p,
+  .welcome p {
+    @apply mt-2 text-slate-700;
+  }
+
+  .registration-form {
+    @apply mt-6 space-y-5;
+  }
+
+  .field {
+    @apply grid gap-2;
+  }
+
+  .field label {
+    @apply font-semibold;
+  }
+
+  .field input {
+    @apply rounded-md border border-slate-400 px-3 py-2 text-base;
+  }
+
+  .field input[aria-invalid="true"] {
+    @apply border-red-700;
+  }
+
+  .field-hint {
+    @apply text-sm text-slate-700;
+  }
+
+  .field-error {
+    @apply text-sm font-medium text-red-800;
+  }
+
+  .form-errors {
+    @apply mt-5 rounded-md border-2 border-red-800 bg-red-50 p-4 text-red-950;
+  }
+
+  .form-errors h2 {
+    @apply font-bold;
+  }
+
+  .form-errors ul {
+    @apply mt-2 list-disc space-y-1 pl-5;
+  }
+
+  input[type="submit"] {
+    @apply w-full cursor-pointer rounded-md bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800;
+  }
+}
