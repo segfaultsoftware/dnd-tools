@@ -13,13 +13,15 @@
 @layer components {
   .registration,
   .session,
-  .welcome {
+  .welcome,
+  .campaign-catalog {
     @apply mx-auto w-full max-w-xl rounded-lg bg-white p-6 shadow-sm sm:p-8;
   }
 
   .registration h1,
   .session h1,
-  .welcome h1 {
+  .welcome h1,
+  .campaign-catalog h1 {
     @apply text-3xl font-bold tracking-tight;
   }
 
@@ -71,6 +73,27 @@
 
   .form-errors ul {
     @apply mt-2 list-disc space-y-1 pl-5;
+  }
+
+  .create-campaign-button {
+    @apply mt-6 inline-flex min-h-11 items-center rounded-md bg-indigo-700 px-4 py-2 font-semibold text-white hover:bg-indigo-800;
+  }
+
+  .campaign-catalog table {
+    @apply mt-5 w-full border-collapse overflow-hidden rounded-lg border border-slate-300 bg-white text-left shadow-sm;
+  }
+
+  .campaign-catalog th,
+  .campaign-catalog td {
+    @apply border-b border-slate-300 px-4 py-3;
+  }
+
+  .campaign-catalog th {
+    @apply bg-slate-100 font-bold;
+  }
+
+  .campaign-catalog tbody tr:last-child td {
+    @apply border-b-0;
   }
 
   input[type="submit"],

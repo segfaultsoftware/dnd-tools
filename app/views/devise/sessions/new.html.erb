@@ -10,7 +10,7 @@
     </section>
   <% end %>
 
-  <%= form_with scope: resource_name, url: session_path(resource_name), class: "session-form" do |form| %>
+  <%= form_with scope: resource_name, url: session_path(resource_name), class: "session-form", data: { turbo: false } do |form| %>
     <% if return_destination %>
       <%= hidden_field_tag :return_to, return_destination %>
     <% end %>
