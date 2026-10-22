@@ -1,0 +1,28 @@
+<% content_for :title, "Campaign Catalog" %>
+
+<section class="campaign-catalog" aria-labelledby="campaign-catalog-heading">
+  <h1 id="campaign-catalog-heading">Campaign Catalog</h1>
+
+  <%= link_to "Create Campaign", "/campaigns/new", class: "create-campaign-button" %>
+
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Name</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if @campaigns.empty? %>
+        <tr>
+          <td>no campaigns yet!</td>
+        </tr>
+      <% else %>
+        <% @campaigns.each do |campaign| %>
+          <tr>
+            <td><%= campaign.name %></td>
+          </tr>
+        <% end %>
+      <% end %>
+    </tbody>
+  </table>
+</section>

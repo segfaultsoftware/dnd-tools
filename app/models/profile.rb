@@ -9,6 +9,10 @@ class Profile < ApplicationRecord
 
   validates :display_name, presence: true
 
+  def campaign_catalog
+    campaigns.to_a.sort_by { |campaign| [ campaign.comparison_key, campaign.name, campaign.id ] }
+  end
+
   private
 
   def default_display_name

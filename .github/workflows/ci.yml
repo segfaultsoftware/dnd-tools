@@ -19,6 +19,7 @@ jobs:
           bundler-cache: true
 
       - name: Set up Chrome
+        id: chrome
         uses: browser-actions/setup-chrome@v2
 
       - name: Build Tailwind CSS
@@ -29,6 +30,9 @@ jobs:
 
       - name: Run RSpec
         run: bundle exec rspec
+        env:
+          CHROME_BINARY: ${{ steps.chrome.outputs.chrome-path }}
+          RAILS_SYSTEM_TESTING_SCREENSHOT_HTML: "1"
 
       - name: Upload Capybara failure artifacts
         if: failure()

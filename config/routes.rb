@@ -18,5 +18,7 @@ Rails.application.routes.draw do
 
   get "changelog", to: "changelog#show"
 
+  resources :campaigns, only: :index
+
   root "home#index"
 end

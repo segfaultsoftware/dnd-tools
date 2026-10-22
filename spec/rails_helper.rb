@@ -11,25 +11,8 @@ require 'rspec/rails'
 require 'capybara/rspec'
 require 'capybara-lockstep'
 require 'axe-rspec'
+require 'fileutils'
 # Add additional requires below this line. Rails is not loaded until this point!
-
-Capybara.register_driver :headless_chrome do |app|
-  options = Selenium::WebDriver::Chrome::Options.new
-  options.add_argument('--headless=new')
-  options.add_argument('--disable-gpu')
-  options.add_argument('--no-sandbox')
-  options.add_argument('--disable-dev-shm-usage')
-  options.add_argument('--window-size=1400,1400')
-  options.binary = ENV.fetch("CHROME_BINARY") if ENV["CHROME_BINARY"]
-
-  # FIXES FOR JAVASCRIPT/TAILWIND THROTTLING ON CI
-  options.add_argument('--disable-background-timer-throttling')
-  options.add_argument('--disable-backgrounding-occluded-windows')
-  options.add_argument('--disable-renderer-backgrounding')
-
-  Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
-end
-Capybara.javascript_driver = :headless_chrome
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
 # spec/support/ and its subdirectories. Files matching `spec/**/*_spec.rb` are
@@ -56,6 +39,43 @@ rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
 end
 RSpec.configure do |config|
+  config.before(:each, type: :system) do
+    driven_by :selenium, using: :chrome, screen_size: [ 1400, 1400 ] do |options|
+      options.add_argument("--headless=new")
+      options.add_argument("--disable-gpu")
+      options.add_argument("--no-sandbox")
+      options.add_argument("--disable-dev-shm-usage")
+      options.add_argument("--disable-background-timer-throttling")
+      options.add_argument("--disable-backgrounding-occluded-windows")
+      options.add_argument("--disable-renderer-backgrounding")
+      options.add_preference("credentials_enable_service", false)
+      options.add_preference("profile.password_manager_enabled", false)
+      options.add_preference("profile.password_manager_leak_detection", false)
+      options.add_preference("autofill.profile_enabled", false)
+      options.add_preference("autofill.credit_card_enabled", false)
+      options.add_option("goog:loggingPrefs", { browser: "ALL", performance: "ALL" })
+      options.binary = ENV.fetch("CHROME_BINARY") if ENV["CHROME_BINARY"]
+    end
+  end
+
+  config.prepend_after(:each, type: :system) do |example|
+    next unless example.exception
+
+    artifact_name = "browser-diagnostics-#{example.full_description.parameterize}-#{Process.pid}"
+    artifact_path = Rails.root.join("tmp/capybara", artifact_name)
+    FileUtils.mkdir_p(artifact_path)
+
+    File.write(artifact_path.join("page-url.txt"), "#{page.current_url}\n")
+
+    browser = page.driver.browser
+    browser.logs.available_types.each do |type|
+      entries = browser.logs.get(type).map(&:inspect)
+      File.write(artifact_path.join("#{type}.log"), entries.join("\n"))
+    end
+  rescue StandardError => error
+    File.write(artifact_path.join("capture-error.log"), error.full_message)
+  end
+
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   config.fixture_paths = [
     Rails.root.join('spec/fixtures')

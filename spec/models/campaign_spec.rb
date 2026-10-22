@@ -42,4 +42,14 @@ RSpec.describe Campaign, type: :model do
     expect(profile.campaigns).to contain_exactly(campaign, dm_campaign)
     expect(profile.dm_campaigns).to contain_exactly(dm_campaign)
   end
+
+  it "orders a profile's catalog by Unicode case-folded name and display spelling" do
+    profile = create_profile
+    campaigns = [ "⚔️ Quest", "Éclair", "apple", "Álpha", "straße", "STRASSE" ].map do |name|
+      described_class.create!(name:).tap { |campaign| CampaignMembership.create!(campaign:, profile:) }
+    end
+
+    expect(profile.campaign_catalog.map(&:name)).to eq([ "apple", "STRASSE", "straße", "Álpha", "Éclair", "⚔️ Quest" ])
+    expect(profile.campaign_catalog).to match_array(campaigns)
+  end
 end
