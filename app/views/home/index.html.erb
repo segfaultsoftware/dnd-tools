@@ -1,6 +1,33 @@
 <% content_for :title, "D&D Tools" %>
 
-<section class="welcome" aria-labelledby="welcome-heading">
-  <h1 id="welcome-heading">D&amp;D Tools</h1>
-  <p>Your account is ready for future campaign tools.</p>
-</section>
+<div class="landing-page">
+  <section class="changelog-section" aria-labelledby="changelog-heading">
+    <h1 id="changelog-heading">Changelog</h1>
+    <pre class="changelog changelog-preview"><%= @changelog %></pre>
+    <%= link_to changelog_path, class: "changelog-expand", target: "_blank", rel: "noopener" do %>
+      <span>Expand</span>
+      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <path d="M7 17 17 7m-7 0h7v7" />
+      </svg>
+      <span class="sr-only"> (opens in a new tab)</span>
+    <% end %>
+  </section>
+
+  <section class="stats-section" aria-labelledby="stats-heading">
+    <h2 id="stats-heading">Stats</h2>
+    <dl class="stats-list">
+      <div>
+        <dt>Unique session views</dt>
+        <dd>45</dd>
+      </div>
+      <div>
+        <dt>Campaigns</dt>
+        <dd>918</dd>
+      </div>
+      <div>
+        <dt>NPCs generated</dt>
+        <dd>2,415</dd>
+      </div>
+    </dl>
+  </section>
+</div>

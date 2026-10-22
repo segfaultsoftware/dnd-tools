@@ -1,10 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["accountButton", "accountMenu", "navigationButton", "shell"]
+  static targets = ["accountButton", "accountMenu", "accountMenuDebugDialog", "navigationButton", "shell"]
 
   connect() {
     this.navigationOpen = false
+    this.element.dataset.applicationShellReady = "true"
   }
 
   toggleNavigation() {
@@ -20,6 +21,7 @@ export default class extends Controller {
 
     this.accountMenuTarget.hidden = !isOpen
     this.accountButtonTarget.setAttribute("aria-expanded", isOpen)
+    if (this.hasAccountMenuDebugDialogTarget) this.accountMenuDebugDialogTarget.showModal()
 
     if (isOpen) this.accountMenuTarget.querySelector("a, button")?.focus()
   }

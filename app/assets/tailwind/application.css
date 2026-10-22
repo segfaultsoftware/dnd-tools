@@ -119,6 +119,10 @@
     @apply block w-full rounded-md px-3 py-2 text-left font-semibold text-slate-950 hover:bg-slate-100;
   }
 
+  .account-menu-debug-dialog {
+    @apply w-[min(100%-2rem,28rem)] rounded-lg border border-red-700 bg-white p-6 text-slate-950 shadow-xl;
+  }
+
   .sidebar {
     @apply row-start-2 border-r border-slate-300 bg-white p-5;
   }
@@ -161,6 +165,60 @@
 
   .forgot-password-dialog::backdrop {
     @apply bg-slate-950/50;
+  }
+
+  .landing-page,
+  .changelog-section,
+  .stats-section {
+    @apply mx-auto w-full max-w-4xl;
+  }
+
+  .landing-page {
+    @apply space-y-10;
+  }
+
+  .changelog-section h1,
+  .stats-section h2 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .changelog {
+    @apply mt-4 box-border rounded-lg border border-violet-700 bg-violet-50 px-4 font-mono text-sm leading-6 text-slate-950;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .changelog-preview {
+    block-size: calc(30 * 1lh);
+    overflow: clip;
+  }
+
+  .changelog-expand {
+    @apply mt-3 inline-flex min-h-11 items-center gap-1 rounded-md px-3 py-2 font-semibold text-indigo-800 underline hover:bg-slate-100 hover:text-indigo-950;
+  }
+
+  .changelog-expand svg {
+    @apply h-5 w-5 shrink-0 stroke-current;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
+  .stats-list {
+    @apply mt-4 grid gap-4 sm:grid-cols-3;
+  }
+
+  .stats-list > div {
+    @apply rounded-lg border border-slate-300 bg-white p-4 shadow-sm;
+  }
+
+  .stats-list dt {
+    @apply text-sm font-semibold text-slate-700;
+  }
+
+  .stats-list dd {
+    @apply mt-1 text-2xl font-bold text-slate-950;
   }
 
   @media (max-width: 767px) {
