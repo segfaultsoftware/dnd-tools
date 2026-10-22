@@ -1,0 +1,42 @@
+<% content_for :title, "Sign in" %>
+
+<section class="session" aria-labelledby="sign-in-heading">
+  <h1 id="sign-in-heading">Sign in</h1>
+
+  <% if flash[:alert].present? %>
+    <section class="form-errors" aria-labelledby="error-summary-heading" role="alert" tabindex="-1">
+      <h2 id="error-summary-heading">Unable to sign in</h2>
+      <p><%= flash[:alert] %></p>
+    </section>
+  <% end %>
+
+  <%= form_with scope: resource_name, url: session_path(resource_name), class: "session-form" do |form| %>
+    <div class="field">
+      <%= form.label :email %>
+      <%= form.email_field :email, autofocus: true, autocomplete: "email", required: true %>
+    </div>
+
+    <div class="field">
+      <%= form.label :password %>
+      <%= form.password_field :password, autocomplete: "current-password", required: true %>
+    </div>
+
+    <div class="field">
+      <label class="flex items-center gap-2 font-normal" for="user_remember_me">
+        <%= form.check_box :remember_me %>
+        Remember me for three weeks
+      </label>
+    </div>
+
+    <%= form.submit "Sign in" %>
+  <% end %>
+
+  <div data-controller="forgot-password">
+    <button type="button" class="forgot-password-button" data-forgot-password-target="trigger" data-action="forgot-password#open">Forgot password?</button>
+
+    <dialog class="forgot-password-dialog" aria-labelledby="forgot-password-title" data-forgot-password-target="dialog" data-action="close->forgot-password#restoreFocus">
+      <h2 id="forgot-password-title">Not Yet Implemented</h2>
+      <button type="button" class="dialog-close-button mt-5" data-forgot-password-target="closeButton" data-action="forgot-password#close">Close</button>
+    </dialog>
+  </div>
+</section>

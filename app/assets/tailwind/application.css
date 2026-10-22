@@ -12,21 +12,28 @@
 
 @layer components {
   .registration,
+  .session,
   .welcome {
     @apply mx-auto w-full max-w-xl rounded-lg bg-white p-6 shadow-sm sm:p-8;
   }
 
   .registration h1,
+  .session h1,
   .welcome h1 {
     @apply text-3xl font-bold tracking-tight;
   }
 
   .registration > p,
+  .session > p,
   .welcome p {
     @apply mt-2 text-slate-700;
   }
 
   .registration-form {
+    @apply mt-6 space-y-5;
+  }
+
+  .session-form {
     @apply mt-6 space-y-5;
   }
 
@@ -66,7 +73,31 @@
     @apply mt-2 list-disc space-y-1 pl-5;
   }
 
-  input[type="submit"] {
+  input[type="submit"],
+  .account-navigation a,
+  .account-navigation button,
+  .dialog-close-button {
     @apply w-full cursor-pointer rounded-md bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800;
+  }
+
+  .account-navigation {
+    @apply absolute right-5 top-5 flex gap-3;
+  }
+
+  .account-navigation a,
+  .account-navigation button {
+    @apply w-auto;
+  }
+
+  .forgot-password-button {
+    @apply font-semibold text-indigo-800 underline hover:text-indigo-950;
+  }
+
+  .forgot-password-dialog {
+    @apply w-[min(100%-2rem,28rem)] rounded-lg border border-slate-400 p-6 text-slate-950 shadow-xl;
+  }
+
+  .forgot-password-dialog::backdrop {
+    @apply bg-slate-950/50;
   }
 }
