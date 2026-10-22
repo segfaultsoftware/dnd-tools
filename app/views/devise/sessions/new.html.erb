@@ -11,6 +11,10 @@
   <% end %>
 
   <%= form_with scope: resource_name, url: session_path(resource_name), class: "session-form" do |form| %>
+    <% if return_destination %>
+      <%= hidden_field_tag :return_to, return_destination %>
+    <% end %>
+
     <div class="field">
       <%= form.label :email %>
       <%= form.email_field :email, autofocus: true, autocomplete: "email", required: true %>
