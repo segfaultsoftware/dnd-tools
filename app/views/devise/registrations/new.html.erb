@@ -16,6 +16,10 @@
   <% end %>
 
   <%= form_with model: resource, as: resource_name, url: registration_path(resource_name), class: "registration-form", html: { novalidate: true } do |form| %>
+    <% if return_destination %>
+      <%= hidden_field_tag :return_to, return_destination %>
+    <% end %>
+
     <div class="field">
       <%= form.label :email %>
       <%= form.email_field :email, autofocus: true, autocomplete: "email", required: true, aria: { describedby: resource.errors[:email].any? ? "email-error" : nil, invalid: resource.errors[:email].any? } %>
