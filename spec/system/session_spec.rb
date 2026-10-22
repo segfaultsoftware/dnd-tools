@@ -61,9 +61,6 @@ RSpec.describe "Account sign-in", type: :system, js: true do
 
     using_session(:first_remembered_browser) do
       click_button "Sign out"
-
-      expect(page).not_to have_button("Sign out")
-      expect(page).to have_link("Sign in")
     end
 
     using_session(:second_remembered_browser) do

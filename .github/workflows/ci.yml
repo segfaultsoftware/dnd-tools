@@ -27,6 +27,14 @@ jobs:
       - name: Run RSpec
         run: bundle exec rspec
 
+      - name: Upload Capybara failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capybara-failures
+          path: tmp/capybara
+          if-no-files-found: ignore
+
   quality:
     name: Quality and security
     runs-on: ubuntu-latest
