@@ -32,6 +32,7 @@ RSpec.describe "Account sign-in", type: :system, js: true do
 
     expect(page).to have_button("Sign out", visible: :all)
     expect(page).to have_css("button[aria-label='Account menu'][aria-expanded='false']")
+    expect(page).to have_css("body[data-application-shell-ready='true']")
     expect(page).to be_axe_clean
     find("button[aria-label='Account menu']").click
     expect(page).to have_button("Sign out")
@@ -52,6 +53,7 @@ RSpec.describe "Account sign-in", type: :system, js: true do
       click_button "Sign in"
 
       expect(page).to have_button("Sign out", visible: :all)
+      expect(page).to have_css("body[data-application-shell-ready='true']")
       find("button[aria-label='Account menu']").click
       expect(page).to have_button("Sign out")
     end
@@ -64,6 +66,7 @@ RSpec.describe "Account sign-in", type: :system, js: true do
       click_button "Sign in"
 
       expect(page).to have_button("Sign out", visible: :all)
+      expect(page).to have_css("body[data-application-shell-ready='true']")
       find("button[aria-label='Account menu']").click
       expect(page).to have_button("Sign out")
     end
@@ -78,5 +81,22 @@ RSpec.describe "Account sign-in", type: :system, js: true do
       find("button[aria-label='Account menu']").click
       expect(page).to have_button("Sign out")
     end
+  end
+
+  it "runs the account-menu action after the signed-in page has loaded" do
+    visit new_user_session_path(return_to: "/?account_menu_debug=1")
+    fill_in "Email", with: user.email
+    fill_in "Password", with: "password"
+    click_button "Sign in"
+
+    account_menu_button = page.find("button[aria-label='Account menu']")
+    expect([ account_menu_button.rect.width, account_menu_button.rect.height ]).to all(be >= 44)
+    expect(page).to have_css("body[data-application-shell-ready='true']")
+
+    account_menu_button.click
+
+    expect(page).to have_css("dialog[open]", text: "Account menu action ran")
+    expect(page).to have_css("#account-menu:not([hidden])")
+    expect(page).to have_button("Sign out")
   end
 end

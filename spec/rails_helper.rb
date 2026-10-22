@@ -21,6 +21,11 @@ Capybara.register_driver :headless_chrome do |app|
   options.add_argument('--window-size=1400,1400')
   options.binary = ENV.fetch("CHROME_BINARY") if ENV["CHROME_BINARY"]
 
+  # FIXES FOR JAVASCRIPT/TAILWIND THROTTLING ON CI
+  options.add_argument('--disable-background-timer-throttling')
+  options.add_argument('--disable-backgrounding-occluded-windows')
+  options.add_argument('--disable-renderer-backgrounding')
+
   Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
 end
 Capybara.javascript_driver = :headless_chrome

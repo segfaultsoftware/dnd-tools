@@ -41,6 +41,15 @@
             <div id="account-menu" class="account-menu" hidden data-application-shell-target="accountMenu">
               <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "account-menu-action" %>
             </div>
+            <% if Rails.env.test? && params[:account_menu_debug] == "1" %>
+              <dialog class="account-menu-debug-dialog" aria-labelledby="account-menu-debug-title" data-application-shell-target="accountMenuDebugDialog">
+                <h2 id="account-menu-debug-title">Account menu action ran</h2>
+                <p>The account menu's Stimulus click handler received the click.</p>
+                <form method="dialog">
+                  <button type="submit" class="dialog-close-button mt-5">Close</button>
+                </form>
+              </dialog>
+            <% end %>
           <% else %>
             <div class="account-links">
               <%= link_to "Sign in", new_user_session_path(return_to: authentication_return_path), class: "account-link" %>
