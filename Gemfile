@@ -49,6 +49,7 @@ group :development, :test do
   # Test framework and browser-based accessibility foundations.
   gem "axe-core-rspec"
   gem "capybara"
+  gem "capybara-lockstep"
   gem "factory_bot_rails"
   gem "rspec-rails"
   gem "selenium-webdriver"

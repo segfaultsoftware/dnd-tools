@@ -30,12 +30,17 @@ RSpec.describe "Account sign-in", type: :system, js: true do
     check "Remember me for three weeks"
     click_button "Sign in"
 
+    expect(page).to have_button("Sign out", visible: :all)
+    expect(page).to have_css("button[aria-label='Account menu'][aria-expanded='false']")
+    expect(page).to be_axe_clean
+    find("button[aria-label='Account menu']").click
     expect(page).to have_button("Sign out")
     expect(user.reload.remember_created_at).to be_present
 
     click_button "Sign out"
 
     expect(page).to have_link("Sign in")
+    expect(page).not_to have_button("Account menu")
   end
 
   it "keeps a separately remembered browser signed in after sign-out elsewhere" do
@@ -46,6 +51,8 @@ RSpec.describe "Account sign-in", type: :system, js: true do
       check "Remember me for three weeks"
       click_button "Sign in"
 
+      expect(page).to have_button("Sign out", visible: :all)
+      find("button[aria-label='Account menu']").click
       expect(page).to have_button("Sign out")
     end
 
@@ -56,6 +63,8 @@ RSpec.describe "Account sign-in", type: :system, js: true do
       check "Remember me for three weeks"
       click_button "Sign in"
 
+      expect(page).to have_button("Sign out", visible: :all)
+      find("button[aria-label='Account menu']").click
       expect(page).to have_button("Sign out")
     end
 
@@ -66,6 +75,7 @@ RSpec.describe "Account sign-in", type: :system, js: true do
     using_session(:second_remembered_browser) do
       visit root_path
 
+      find("button[aria-label='Account menu']").click
       expect(page).to have_button("Sign out")
     end
   end

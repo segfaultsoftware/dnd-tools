@@ -21,6 +21,9 @@ jobs:
       - name: Set up Chrome
         uses: browser-actions/setup-chrome@v1
 
+      - name: Build Tailwind CSS
+        run: bin/rails tailwindcss:build
+
       - name: Prepare test database
         run: bin/rails db:prepare
 
