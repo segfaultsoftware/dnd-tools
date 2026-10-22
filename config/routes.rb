@@ -1,5 +1,5 @@
 Rails.application.routes.draw do
-  devise_for :users, skip: %i[registrations sessions], controllers: { registrations: "registrations" }
+  devise_for :users, skip: :registrations, controllers: { registrations: "registrations" }
 
   devise_scope :user do
     get "users/sign_up", to: "registrations#new", as: :new_user_registration
