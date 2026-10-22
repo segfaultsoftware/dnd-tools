@@ -9,6 +9,7 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 # return unless Rails.env.test?
 require 'rspec/rails'
 require 'capybara/rspec'
+require 'capybara-lockstep'
 require 'axe-rspec'
 # Add additional requires below this line. Rails is not loaded until this point!
 
@@ -18,6 +19,7 @@ Capybara.register_driver :headless_chrome do |app|
   options.add_argument('--disable-gpu')
   options.add_argument('--no-sandbox')
   options.add_argument('--window-size=1400,1400')
+  options.binary = ENV.fetch("CHROME_BINARY") if ENV["CHROME_BINARY"]
 
   Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
 end

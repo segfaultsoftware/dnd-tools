@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <title><%= content_for(:title) || "Dnd Tools" %></title>
+    <title>TTRPG Tools &amp; Campaign Management</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Dnd Tools">
+    <meta name="application-name" content="TTRPG Tools & Campaign Management">
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -20,20 +20,60 @@
 
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= capybara_lockstep if defined?(Capybara::Lockstep) %>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <nav class="account-navigation" aria-label="Account">
-      <% if user_signed_in? %>
-        <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "sign-out-button" %>
-      <% else %>
-        <%= link_to "Sign in", new_user_session_path(return_to: authentication_return_path) %>
-        <%= link_to "Sign up", new_user_registration_path(return_to: authentication_return_path) %>
-      <% end %>
-    </nav>
-    <main class="container mx-auto flex min-h-screen items-start px-5 py-12 sm:items-center">
-      <%= yield %>
-    </main>
+  <body data-controller="application-shell" data-action="click@document->application-shell#closeAccountMenu keydown@window->application-shell#closeWithEscape">
+    <div class="application-shell" data-application-shell-target="shell">
+      <header class="app-header">
+        <button type="button" class="navigation-toggle" aria-label="Menu: open navigation" aria-controls="primary-navigation" aria-expanded="false" data-application-shell-target="navigationButton" data-action="application-shell#toggleNavigation">
+          <span>Menu</span>
+        </button>
+
+        <nav class="account-navigation" aria-label="Account">
+          <% if user_signed_in? %>
+            <button type="button" class="account-menu-button" aria-label="Account menu" aria-controls="account-menu" aria-expanded="false" data-application-shell-target="accountButton" data-action="application-shell#toggleAccountMenu">
+              <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                <path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.1 0-7.5 2.1-7.5 4.75V21h15v-2.25C19.5 16.1 16.1 14 12 14Z" />
+              </svg>
+            </button>
+            <div id="account-menu" class="account-menu" hidden data-application-shell-target="accountMenu">
+              <%= button_to "Sign out", destroy_user_session_path, method: :delete, class: "account-menu-action" %>
+            </div>
+          <% else %>
+            <div class="account-links">
+              <%= link_to "Sign in", new_user_session_path(return_to: authentication_return_path), class: "account-link" %>
+              <%= link_to "Sign up", new_user_registration_path(return_to: authentication_return_path), class: "account-link" %>
+            </div>
+          <% end %>
+        </nav>
+      </header>
+
+      <aside id="primary-navigation" class="sidebar" aria-label="Primary navigation" data-application-shell-target="navigation">
+        <div class="sidebar-brand">TTRPG Tools &amp; Campaign Management</div>
+        <nav aria-label="Tools">
+          <section class="navigation-group" aria-labelledby="dnd-tools-heading">
+            <h2 id="dnd-tools-heading">D&amp;D 5.5e Tools</h2>
+            <ul>
+              <li>NPC Generator</li>
+              <li>Magic Shop Generator</li>
+              <li>Loot Generator</li>
+              <li>Town Generator</li>
+            </ul>
+          </section>
+          <section class="navigation-group" aria-labelledby="campaign-tools-heading">
+            <h2 id="campaign-tools-heading">Campaign Tools</h2>
+            <ul>
+              <li><%= link_to "Campaign Catalog", "/campaigns" %></li>
+            </ul>
+          </section>
+        </nav>
+      </aside>
+
+      <main id="main-content" class="app-main">
+        <%= yield %>
+      </main>
+    </div>
   </body>
 </html>
