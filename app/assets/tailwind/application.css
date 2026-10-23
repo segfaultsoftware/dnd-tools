@@ -14,20 +14,23 @@
   .registration,
   .session,
   .welcome,
-  .campaign-catalog {
+  .campaign-catalog,
+  .campaign-creation {
     @apply mx-auto w-full max-w-xl rounded-lg bg-white p-6 shadow-sm sm:p-8;
   }
 
   .registration h1,
   .session h1,
   .welcome h1,
-  .campaign-catalog h1 {
+  .campaign-catalog h1,
+  .campaign-creation h1 {
     @apply text-3xl font-bold tracking-tight;
   }
 
   .registration > p,
   .session > p,
-  .welcome p {
+  .welcome p,
+  .campaign-creation > p {
     @apply mt-2 text-slate-700;
   }
 
@@ -37,6 +40,14 @@
 
   .session-form {
     @apply mt-6 space-y-5;
+  }
+
+  .campaign-form {
+    @apply mt-6 space-y-5;
+  }
+
+  .campaign-catalog {
+    @apply max-w-[42rem];
   }
 
   .field {
@@ -49,6 +60,10 @@
 
   .field input {
     @apply rounded-md border border-slate-400 px-3 py-2 text-base;
+  }
+
+  .campaign-form .field input {
+    @apply box-border w-full max-w-full;
   }
 
   .field input[aria-invalid="true"] {
@@ -75,17 +90,29 @@
     @apply mt-2 list-disc space-y-1 pl-5;
   }
 
+  .form-errors a {
+    @apply rounded-sm font-medium text-red-900 underline hover:text-red-950;
+  }
+
+  .success-message {
+    @apply mt-5 rounded-md border-2 border-green-700 bg-green-50 p-4 font-semibold text-green-950;
+  }
+
   .create-campaign-button {
     @apply mt-6 inline-flex min-h-11 items-center rounded-md bg-indigo-700 px-4 py-2 font-semibold text-white hover:bg-indigo-800;
   }
 
   .campaign-catalog table {
-    @apply mt-5 w-full border-collapse overflow-hidden rounded-lg border border-slate-300 bg-white text-left shadow-sm;
+    @apply mt-5 w-full table-fixed border-collapse overflow-hidden rounded-lg border border-slate-300 bg-white text-left shadow-sm;
   }
 
   .campaign-catalog th,
   .campaign-catalog td {
     @apply border-b border-slate-300 px-4 py-3;
+  }
+
+  .campaign-catalog td {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap;
   }
 
   .campaign-catalog th {

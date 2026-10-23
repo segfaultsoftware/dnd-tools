@@ -3,7 +3,11 @@
 <section class="campaign-catalog" aria-labelledby="campaign-catalog-heading">
   <h1 id="campaign-catalog-heading">Campaign Catalog</h1>
 
-  <%= link_to "Create Campaign", "/campaigns/new", class: "create-campaign-button" %>
+  <% if flash[:notice].present? %>
+    <p class="success-message" role="status"><%= flash[:notice] %></p>
+  <% end %>
+
+  <%= link_to "Create Campaign", new_campaign_path, class: "create-campaign-button" %>
 
   <table>
     <thead>
