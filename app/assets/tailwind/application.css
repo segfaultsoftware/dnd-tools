@@ -15,7 +15,8 @@
   .session,
   .welcome,
   .campaign-catalog,
-  .campaign-creation {
+  .campaign-creation,
+  .loot-generator {
     @apply mx-auto w-full max-w-xl rounded-lg bg-white p-6 shadow-sm sm:p-8;
   }
 
@@ -23,7 +24,8 @@
   .session h1,
   .welcome h1,
   .campaign-catalog h1,
-  .campaign-creation h1 {
+  .campaign-creation h1,
+  .loot-generator h1 {
     @apply text-3xl font-bold tracking-tight;
   }
 
@@ -121,6 +123,73 @@
 
   .campaign-catalog tbody tr:last-child td {
     @apply border-b-0;
+  }
+
+  .loot-generator {
+    @apply max-w-[42rem];
+  }
+
+  .loot-generator h2 {
+    @apply text-2xl font-bold tracking-tight;
+  }
+
+  .individual-treasure {
+    @apply mt-8;
+  }
+
+  .loot-controls {
+    @apply mt-5 flex flex-wrap items-end gap-4;
+  }
+
+  .loot-field {
+    @apply grid min-w-40 flex-1 gap-2;
+  }
+
+  .loot-field label {
+    @apply font-semibold;
+  }
+
+  .loot-field select {
+    @apply min-h-11 w-full rounded-md border border-slate-500 bg-white px-3 py-2 text-base text-slate-950;
+  }
+
+  .loot-generate-button {
+    @apply inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md bg-indigo-700 px-5 py-2 font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:bg-slate-400 disabled:text-slate-950;
+  }
+
+  .loot-results:not(:empty) {
+    @apply mt-6;
+  }
+
+  .loot-result-list {
+    @apply grid gap-3;
+  }
+
+  .loot-result-list li {
+    @apply flex min-w-0 items-center gap-3 rounded-md border border-slate-300 bg-slate-50 px-3 py-2 font-semibold;
+  }
+
+  .loot-result-list li > span {
+    overflow-wrap: anywhere;
+  }
+
+  .loot-copy-button {
+    @apply ml-auto inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-indigo-800 hover:bg-indigo-100 hover:text-indigo-950;
+  }
+
+  .loot-copy-button svg {
+    @apply h-6 w-6 fill-none stroke-current;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+  }
+
+  .loot-generator hr {
+    @apply my-8 border-0 border-t border-slate-400;
+  }
+
+  .treasure-horde {
+    @apply min-h-48;
   }
 
   input[type="submit"],

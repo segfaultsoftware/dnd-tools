@@ -36,4 +36,23 @@ RSpec.describe "Public content", type: :request do
     expect(response.body).not_to include("<strong>notes</strong>")
     expect(response.body).to include("Release note 31")
   end
+
+  it "renders the loot generator publicly with the exact controls and page structure" do
+    get loot_path
+
+    expect(response).to have_http_status(:ok)
+
+    document = Nokogiri::HTML5(response.body)
+    expect(document.css("main h1").map(&:text)).to eq([ "Loot Generator" ])
+    expect(document.css("main h2").map(&:text)).to eq([ "Individual Treasure", "Treasure Horde" ])
+    expect(document.css("main section + hr + section").length).to eq(1)
+
+    select = document.at_css("select#monster-cr")
+    expect(select.previous_element.text.strip).to eq("Monster CR")
+    expect(select.css("option").map(&:text)).to eq(
+      [ "Select a CR", "1/8", "1/4", "1/2", *1.upto(16).map(&:to_s), "17+" ]
+    )
+    expect(select.at_css("option[selected]")["value"]).to eq("")
+    expect(document.at_css("button[type='submit'][disabled]").text.strip).to eq("Generate")
+  end
 end

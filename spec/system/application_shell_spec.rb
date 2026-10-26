@@ -14,6 +14,7 @@ RSpec.describe "Application shell", type: :system, js: true do
     expect(page).to have_text("Loot Generator")
     expect(page).to have_text("Town Generator")
     expect(page).to have_link("Campaign Catalog", href: "/campaigns")
+    expect(page).to have_link("Loot Generator", href: "/loot")
     expect(page).not_to have_link("NPC Generator")
     expect(page).to be_axe_clean
 
