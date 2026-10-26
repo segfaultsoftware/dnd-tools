@@ -17,6 +17,7 @@ Rails.application.routes.draw do
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   get "changelog", to: "changelog#show"
+  get "loot", to: "loot#show"
 
   resources :campaigns, only: [ :index, :new, :create ]
 
