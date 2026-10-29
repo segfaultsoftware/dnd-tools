@@ -1,4 +1,5 @@
 class Campaign < ApplicationRecord
+  has_many :loot_tables, dependent: :destroy
   has_many :campaign_memberships, dependent: :destroy, inverse_of: :campaign
   has_many :profiles, through: :campaign_memberships
 
