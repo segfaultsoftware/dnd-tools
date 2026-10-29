@@ -38,6 +38,13 @@ RSpec.describe "Public content", type: :request do
   end
 
   it "renders the loot generator publicly with the exact controls and page structure" do
+    category_table = LootTable.create!(name: "Treasure Hoard Categories", table_type: "treasure_hoard_categories", default: true)
+    valuables_table = LootTable.create!(name: "Gemstones & Art", table_type: "gemstone_art", default: true)
+    magic_items_table = LootTable.create!(name: "Magic Items", table_type: "magic_items", default: true)
+    category_table.treasure_hoard_categories.create!(challenge_rating: "0-4", weight: 1)
+    valuables_table.gemstone_art_entries.create!(entry_type: "Gemstone", value: "10 gp", weight: 1, description: "SQL-backed gem")
+    magic_items_table.magic_item_entries.create!(item_type: "A", weight: 1, name: "SQL-backed item", link: "https://example.com/item")
+
     get loot_path
 
     expect(response).to have_http_status(:ok)
@@ -47,12 +54,24 @@ RSpec.describe "Public content", type: :request do
     expect(document.css("main h2").map(&:text)).to eq([ "Individual Treasure", "Treasure Horde" ])
     expect(document.css("main section + hr + section").length).to eq(1)
 
-    select = document.at_css("select#monster-cr")
-    expect(select.previous_element.text.strip).to eq("Monster CR")
-    expect(select.css("option").map(&:text)).to eq(
+    individual_select = document.at_css("select#individual-monster-cr")
+    expect(individual_select.previous_element.text.strip).to eq("Monster CR")
+    expect(individual_select.css("option").map(&:text)).to eq(
       [ "Select a CR", "1/8", "1/4", "1/2", *1.upto(16).map(&:to_s), "17+" ]
     )
-    expect(select.at_css("option[selected]")["value"]).to eq("")
-    expect(document.at_css("button[type='submit'][disabled]").text.strip).to eq("Generate")
+    expect(individual_select.at_css("option[selected]")["value"]).to eq("")
+
+    horde_select = document.at_css("select#horde-monster-cr")
+    expect(horde_select.previous_element.text.strip).to eq("Monster CR")
+    expect(horde_select.css("option").map(&:text)).to eq([ "Select a CR", "0-4", "5-10", "11-16", "17+" ])
+    expect(horde_select.at_css("option[selected]")["value"]).to eq("")
+    expect(document.css("button[type='submit'][disabled]").map { |button| button.text.strip }).to eq([ "Generate", "Generate" ])
+
+    bootstrapped_data = JSON.parse(document.at_css("[data-loot-horde-data-value]")["data-loot-horde-data-value"])
+    expect(bootstrapped_data).to include(
+      "categories" => [ include("challenge_rating" => "0-4", "weight" => 1) ],
+      "valuables" => [ include("description" => "SQL-backed gem") ],
+      "magic_items" => [ include("name" => "SQL-backed item", "link" => "https://example.com/item") ]
+    )
   end
 end
