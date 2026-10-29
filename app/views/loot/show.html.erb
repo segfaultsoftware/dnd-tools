@@ -1,6 +1,8 @@
 <% content_for :title, "Loot Generator" %>
 
-<article class="loot-generator" data-controller="loot">
+<article class="loot-generator"
+         data-controller="loot"
+         data-loot-horde-data-value="<%= @treasure_horde_data.to_json %>">
   <h1>Loot Generator</h1>
 
   <section class="individual-treasure" aria-labelledby="individual-treasure-heading">
@@ -8,8 +10,8 @@
 
     <form class="loot-controls" data-action="submit->loot#generate">
       <div class="loot-field">
-        <label for="monster-cr">Monster CR</label>
-        <select id="monster-cr" name="monster_cr" data-loot-target="challengeRating" data-action="change->loot#updateButton">
+        <label for="individual-monster-cr">Monster CR</label>
+        <select id="individual-monster-cr" name="monster_cr" data-loot-target="challengeRating" data-action="change->loot#updateButton">
           <option value="" selected>Select a CR</option>
           <% [ "1/8", "1/4", "1/2", *1..16, "17+" ].each do |challenge_rating| %>
             <option value="<%= challenge_rating %>"><%= challenge_rating %></option>
@@ -28,5 +30,22 @@
 
   <section class="treasure-horde" aria-labelledby="treasure-horde-heading">
     <h2 id="treasure-horde-heading">Treasure Horde</h2>
+
+    <form class="loot-controls" data-action="submit->loot#generateHordes">
+      <div class="loot-field">
+        <label for="horde-monster-cr">Monster CR</label>
+        <select id="horde-monster-cr" name="horde_monster_cr" data-loot-target="hordeChallengeRating" data-action="change->loot#updateHordeButton">
+          <option value="" selected>Select a CR</option>
+          <% [ "0-4", "5-10", "11-16", "17+" ].each do |challenge_rating| %>
+            <option value="<%= challenge_rating %>"><%= challenge_rating %></option>
+          <% end %>
+        </select>
+      </div>
+
+      <button type="submit" class="loot-generate-button" disabled data-loot-target="hordeGenerateButton">Generate</button>
+    </form>
+
+    <div class="horde-results" role="status" aria-live="polite" aria-atomic="true" data-loot-target="hordeResults"></div>
+    <p class="sr-only" role="status" data-loot-target="hordeCopyStatus"></p>
   </section>
 </article>
