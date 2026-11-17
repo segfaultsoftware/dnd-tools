@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe LootTable, type: :model do
   it "seeds the three default relational tables idempotently with every spreadsheet row" do
-    2.times { load Rails.root.join("db/seeds/treasure_horde.rb") }
+    2.times { load Rails.root.join("db/seeds/treasure_hoard.rb") }
 
     expect(described_class.defaults.count).to eq(3)
     expect(TreasureHoardCategory.count).to eq(104)

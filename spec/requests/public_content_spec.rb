@@ -51,7 +51,7 @@ RSpec.describe "Public content", type: :request do
 
     document = Nokogiri::HTML5(response.body)
     expect(document.css("main h1").map(&:text)).to eq([ "Loot Generator" ])
-    expect(document.css("main h2").map(&:text)).to eq([ "Individual Treasure", "Treasure Horde" ])
+    expect(document.css("main h2").map(&:text)).to eq([ "Individual Treasure", "Treasure Hoard" ])
     expect(document.css("main section + hr + section").length).to eq(1)
 
     individual_select = document.at_css("select#individual-monster-cr")
@@ -61,13 +61,13 @@ RSpec.describe "Public content", type: :request do
     )
     expect(individual_select.at_css("option[selected]")["value"]).to eq("")
 
-    horde_select = document.at_css("select#horde-monster-cr")
-    expect(horde_select.previous_element.text.strip).to eq("Monster CR")
-    expect(horde_select.css("option").map(&:text)).to eq([ "Select a CR", "0-4", "5-10", "11-16", "17+" ])
-    expect(horde_select.at_css("option[selected]")["value"]).to eq("")
+    hoard_select = document.at_css("select#hoard-monster-cr")
+    expect(hoard_select.previous_element.text.strip).to eq("Monster CR")
+    expect(hoard_select.css("option").map(&:text)).to eq([ "Select a CR", "0-4", "5-10", "11-16", "17+" ])
+    expect(hoard_select.at_css("option[selected]")["value"]).to eq("")
     expect(document.css("button[type='submit'][disabled]").map { |button| button.text.strip }).to eq([ "Generate", "Generate" ])
 
-    bootstrapped_data = JSON.parse(document.at_css("[data-loot-horde-data-value]")["data-loot-horde-data-value"])
+    bootstrapped_data = JSON.parse(document.at_css("[data-loot-hoard-data-value]")["data-loot-hoard-data-value"])
     expect(bootstrapped_data).to include(
       "categories" => [ include("challenge_rating" => "0-4", "weight" => 1) ],
       "valuables" => [ include("description" => "SQL-backed gem") ],

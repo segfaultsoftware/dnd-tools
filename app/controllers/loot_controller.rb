@@ -4,7 +4,7 @@ class LootController < ApplicationController
     valuables_table = LootTable.default_for!("gemstone_art")
     magic_items_table = LootTable.default_for!("magic_items")
 
-    @treasure_horde_data = {
+    @treasure_hoard_data = {
       categories: category_table.treasure_hoard_categories.order(:id).map do |category|
         category.attributes.slice(
           "challenge_rating", "weight", "valuable_min_count", "valuable_max_count",

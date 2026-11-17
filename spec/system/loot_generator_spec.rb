@@ -10,14 +10,14 @@ RSpec.describe "Loot generator", type: :system, js: true do
     click_link "Loot Generator"
 
     expect(page).to have_current_path(loot_path)
-    expect(page.all("main h1, main h2").map(&:text)).to eq([ "Loot Generator", "Individual Treasure", "Treasure Horde" ])
-    expect(page).to have_selector("section.individual-treasure + hr + section.treasure-horde")
+    expect(page.all("main h1, main h2").map(&:text)).to eq([ "Loot Generator", "Individual Treasure", "Treasure Hoard" ])
+    expect(page).to have_selector("section.individual-treasure + hr + section.treasure-hoard")
     within(".individual-treasure") do
       expect(page).to have_select("Monster CR", selected: "Select a CR", options: [ "Select a CR", "1/8", "1/4", "1/2", *1.upto(16).map(&:to_s), "17+" ])
       expect(page).to have_button("Generate", disabled: true)
     end
-    expect(page).to have_selector(".treasure-horde h2", text: "Treasure Horde")
-    within(".treasure-horde") do
+    expect(page).to have_selector(".treasure-hoard h2", text: "Treasure Hoard")
+    within(".treasure-hoard") do
       expect(page).to have_select("Monster CR", selected: "Select a CR", options: [ "Select a CR", "0-4", "5-10", "11-16", "17+" ])
       expect(page).to have_button("Generate", disabled: true)
     end
@@ -66,19 +66,19 @@ RSpec.describe "Loot generator", type: :system, js: true do
     expect(page.driver.browser.switch_to.active_element.text).to eq("Generate")
   end
 
-  it "generates, sorts, copies, and replaces three independent treasure hordes" do
+  it "generates, sorts, copies, and replaces three independent treasure hoards" do
     visit loot_path
 
-    within(".treasure-horde") do
+    within(".treasure-hoard") do
       select "0-4", from: "Monster CR"
       expect(page).to have_button("Generate", disabled: false)
     end
     expect(find("#individual-monster-cr").value).to eq("")
 
     stub_random([ 0.0, 0.3, 0.9, 0.1, 0.9, 0.1, 0.1, 0.0, 0.1 ])
-    within(".treasure-horde") { find_button("Generate").send_keys(:enter) }
+    within(".treasure-hoard") { find_button("Generate").send_keys(:enter) }
 
-    rows = page.all(".treasure-horde-result")
+    rows = page.all(".treasure-hoard-result")
     expect(rows.length).to eq(3)
     expect(rows[0]).to have_text("Empty hoard")
     expect(rows[0]).to have_no_selector("ul")
@@ -92,8 +92,8 @@ RSpec.describe "Loot generator", type: :system, js: true do
       "Philter of love"
     ])
     expect(rows[2]).to have_link("Philter of love", href: "https://example.com/philter")
-    expect(page).to have_selector(".horde-results[role='status'][aria-live='polite'][aria-atomic='true']")
-    expect(page.driver.browser.switch_to.active_element.attribute("data-loot-target")).to eq("hordeGenerateButton")
+    expect(page).to have_selector(".hoard-results[role='status'][aria-live='polite'][aria-atomic='true']")
+    expect(page.driver.browser.switch_to.active_element.attribute("data-loot-target")).to eq("hoardGenerateButton")
     expect(page).to be_axe_clean
 
     page.current_window.resize_to(375, 812)
@@ -102,34 +102,34 @@ RSpec.describe "Loot generator", type: :system, js: true do
     page.current_window.resize_to(1400, 1400)
 
     stub_clipboard
-    copy_button = rows[2].find("button[aria-label='Copy treasure horde 3 to clipboard']")
+    copy_button = rows[2].find("button[aria-label='Copy treasure hoard 3 to clipboard']")
     copy_button.send_keys(:enter)
     expect(page.evaluate_script("window.copiedLoot")).to eq(<<~MARKDOWN.chomp)
       - 10gp gem Azurite (opaque mottled deep blue)
       - 10gp gem Azurite (opaque mottled deep blue)
       - [Philter of love](https://example.com/philter)
     MARKDOWN
-    expect(page).to have_selector("[data-loot-target='hordeCopyStatus']", text: "Treasure horde 3 copied to clipboard", visible: :all)
+    expect(page).to have_selector("[data-loot-target='hoardCopyStatus']", text: "Treasure hoard 3 copied to clipboard", visible: :all)
 
     stub_clipboard_failure
     copy_button.send_keys(:enter)
-    expect(page).to have_selector("[data-loot-target='hordeCopyStatus']", text: "Unable to copy treasure horde 3 to clipboard", visible: :all)
+    expect(page).to have_selector("[data-loot-target='hoardCopyStatus']", text: "Unable to copy treasure hoard 3 to clipboard", visible: :all)
 
     stub_random([ 0.0, 0.0, 0.0 ])
-    within(".treasure-horde") { click_button "Generate" }
-    replaced_text = page.all(".treasure-horde-result").map(&:text).join(" ")
+    within(".treasure-hoard") { click_button "Generate" }
+    replaced_text = page.all(".treasure-hoard-result").map(&:text).join(" ")
     expect(replaced_text).not_to include("Malachite")
     expect(replaced_text).not_to include("Philter")
     expect(page).to have_text("Empty hoard", count: 3)
   end
 
-  it "uses weighted, bounded, inclusive, and replacement horde algorithms" do
+  it "uses weighted, bounded, inclusive, and replacement hoard algorithms" do
     visit loot_path
 
     results = page.evaluate_async_script(<<~JAVASCRIPT)
       const done = arguments[arguments.length - 1];
 
-      import("controllers/loot_controller").then(({ weightedSelection, sampleBoundedGaussian, inclusiveUniformInteger, generateTreasureHorde, hordeMarkdown }) => {
+      import("controllers/loot_controller").then(({ weightedSelection, sampleBoundedGaussian, inclusiveUniformInteger, generateTreasureHoard, hoardMarkdown }) => {
         const sequence = (values) => {
           let calls = 0;
           return { random: () => values[calls++], calls: () => calls };
@@ -145,8 +145,8 @@ RSpec.describe "Loot generator", type: :system, js: true do
           valuables: [{ entry_type: "Art", value: "25 gp", weight: 1, description: "Silver ewer" }],
           magic_items: [{ item_type: "A", weight: 1, name: "Potion", link: "https://example.com/potion" }]
         };
-        const art = generateTreasureHorde(data, "test", sequence([0, 0, 0]).random);
-        const magic = generateTreasureHorde(data, "magic", sequence([0, 0, 0, 0]).random);
+        const art = generateTreasureHoard(data, "test", sequence([0, 0, 0]).random);
+        const magic = generateTreasureHoard(data, "magic", sequence([0, 0, 0, 0]).random);
 
         done({
           weightedFirst: weightedSelection(weighted, () => 0).name,
@@ -158,8 +158,8 @@ RSpec.describe "Loot generator", type: :system, js: true do
           inclusiveMaximum: inclusiveUniformInteger(2, 6, () => 0.999999),
           art: art.map((entry) => entry.text),
           magic: magic.map((entry) => entry.text),
-          markdown: hordeMarkdown(magic),
-          empty: hordeMarkdown(generateTreasureHorde(data, "empty", () => 0))
+          markdown: hoardMarkdown(magic),
+          empty: hoardMarkdown(generateTreasureHoard(data, "empty", () => 0))
         });
       }).catch((error) => done({ error: error.message }));
     JAVASCRIPT

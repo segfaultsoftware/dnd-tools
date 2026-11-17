@@ -31,7 +31,7 @@ export const COIN_VALUES = Object.freeze([
 ])
 
 const DISPLAY_ORDER = ["PP", "GP", "SP", "CP"]
-const HORDE_DISPLAY_ORDER = Object.freeze({ gems: 0, art: 1, magic: 2 })
+const HOARD_DISPLAY_ORDER = Object.freeze({ gems: 0, art: 1, magic: 2 })
 
 export function samplePurse(maximum, random = Math.random) {
   const mean = maximum / 2
@@ -108,7 +108,7 @@ export function inclusiveUniformInteger(minimum, maximum, random = Math.random) 
   return minimum + Math.floor(random() * (maximum - minimum + 1))
 }
 
-export function generateTreasureHorde(data, challengeRating, random = Math.random) {
+export function generateTreasureHoard(data, challengeRating, random = Math.random) {
   const category = weightedSelection(
     data.categories.filter((candidate) => candidate.challenge_rating === challengeRating),
     random
@@ -146,12 +146,12 @@ export function generateTreasureHorde(data, challengeRating, random = Math.rando
   }
 
   return entries.sort((left, right) => {
-    const categoryDifference = HORDE_DISPLAY_ORDER[left.kind] - HORDE_DISPLAY_ORDER[right.kind]
+    const categoryDifference = HOARD_DISPLAY_ORDER[left.kind] - HOARD_DISPLAY_ORDER[right.kind]
     return categoryDifference || left.text.localeCompare(right.text, undefined, { sensitivity: "base" })
   })
 }
 
-export function hordeMarkdown(entries) {
+export function hoardMarkdown(entries) {
   if (entries.length === 0) return "Empty hoard"
 
   return entries.map((entry) => entry.kind === "magic"
@@ -162,21 +162,21 @@ export function hordeMarkdown(entries) {
 export default class extends Controller {
   static targets = [
     "challengeRating", "copyStatus", "generateButton", "results",
-    "hordeChallengeRating", "hordeCopyStatus", "hordeGenerateButton", "hordeResults"
+    "hoardChallengeRating", "hoardCopyStatus", "hoardGenerateButton", "hoardResults"
   ]
-  static values = { hordeData: Object }
+  static values = { hoardData: Object }
 
   connect() {
     this.updateButton()
-    this.updateHordeButton()
+    this.updateHoardButton()
   }
 
   updateButton() {
     this.generateButtonTarget.disabled = this.challengeRatingTarget.value === ""
   }
 
-  updateHordeButton() {
-    this.hordeGenerateButtonTarget.disabled = this.hordeChallengeRatingTarget.value === ""
+  updateHoardButton() {
+    this.hoardGenerateButtonTarget.disabled = this.hoardChallengeRatingTarget.value === ""
   }
 
   generate(event) {
@@ -205,20 +205,20 @@ export default class extends Controller {
     this.generateButtonTarget.focus()
   }
 
-  generateHordes(event) {
+  generateHoards(event) {
     event.preventDefault()
 
-    const challengeRating = this.hordeChallengeRatingTarget.value
+    const challengeRating = this.hoardChallengeRatingTarget.value
     if (!TreasureHoardCategoryChallengeRatings.includes(challengeRating)) return
 
-    this.hordeCopyStatusTarget.textContent = ""
+    this.hoardCopyStatusTarget.textContent = ""
     const results = document.createElement("div")
-    results.className = "treasure-horde-result-list"
+    results.className = "treasure-hoard-result-list"
 
     for (let index = 0; index < 3; index += 1) {
-      const entries = generateTreasureHorde(this.hordeDataValue, challengeRating)
+      const entries = generateTreasureHoard(this.hoardDataValue, challengeRating)
       const row = document.createElement("div")
-      row.className = "treasure-horde-result"
+      row.className = "treasure-hoard-result"
 
       if (entries.length === 0) {
         const empty = document.createElement("p")
@@ -241,12 +241,12 @@ export default class extends Controller {
         row.append(list)
       }
 
-      row.append(this.hordeCopyButton(hordeMarkdown(entries), index + 1))
+      row.append(this.hoardCopyButton(hoardMarkdown(entries), index + 1))
       results.append(row)
     }
 
-    this.hordeResultsTarget.replaceChildren(results)
-    this.hordeGenerateButtonTarget.focus()
+    this.hoardResultsTarget.replaceChildren(results)
+    this.hoardGenerateButtonTarget.focus()
   }
 
   async copy(event) {
@@ -282,26 +282,26 @@ export default class extends Controller {
     return button
   }
 
-  async copyHorde(event) {
+  async copyHoard(event) {
     const copyText = event.currentTarget.dataset.copyText
-    const hordeNumber = event.currentTarget.dataset.hordeNumber
-    this.hordeCopyStatusTarget.textContent = ""
+    const hoardNumber = event.currentTarget.dataset.hoardNumber
+    this.hoardCopyStatusTarget.textContent = ""
 
     try {
       await navigator.clipboard.writeText(copyText)
-      this.hordeCopyStatusTarget.textContent = `Treasure horde ${hordeNumber} copied to clipboard`
+      this.hoardCopyStatusTarget.textContent = `Treasure hoard ${hoardNumber} copied to clipboard`
     } catch {
-      this.hordeCopyStatusTarget.textContent = `Unable to copy treasure horde ${hordeNumber} to clipboard`
+      this.hoardCopyStatusTarget.textContent = `Unable to copy treasure hoard ${hoardNumber} to clipboard`
     }
   }
 
-  hordeCopyButton(copyText, hordeNumber) {
+  hoardCopyButton(copyText, hoardNumber) {
     const button = this.copyButton("")
     delete button.dataset.coinString
-    button.dataset.action = "loot#copyHorde"
+    button.dataset.action = "loot#copyHoard"
     button.dataset.copyText = copyText
-    button.dataset.hordeNumber = hordeNumber
-    button.setAttribute("aria-label", `Copy treasure horde ${hordeNumber} to clipboard`)
+    button.dataset.hoardNumber = hoardNumber
+    button.setAttribute("aria-label", `Copy treasure hoard ${hoardNumber} to clipboard`)
     return button
   }
 }
