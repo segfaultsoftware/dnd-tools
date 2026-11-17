@@ -66,7 +66,7 @@ RSpec.describe "Loot generator", type: :system, js: true do
     expect(page.driver.browser.switch_to.active_element.text).to eq("Generate")
   end
 
-  it "generates, sorts, copies, and replaces three independent treasure hoards" do
+  it "generates, consolidates, sorts, copies, and replaces three independent treasure hoards" do
     visit loot_path
 
     within(".treasure-hoard") do
@@ -75,7 +75,7 @@ RSpec.describe "Loot generator", type: :system, js: true do
     end
     expect(find("#individual-monster-cr").value).to eq("")
 
-    stub_random([ 0.0, 0.3, 0.9, 0.1, 0.9, 0.1, 0.1, 0.0, 0.1 ])
+    stub_random([ 0.0, 0.3, 0.9, 0.1, 0.9, 0.1, 0.1, 0.0, 0.1, 0.1 ])
     within(".treasure-hoard") { find_button("Generate").send_keys(:enter) }
 
     rows = page.all(".treasure-hoard-result")
@@ -87,9 +87,8 @@ RSpec.describe "Loot generator", type: :system, js: true do
       "10gp gem Malachite (opaque striated light and dark green)"
     ])
     expect(rows[2].all("li").map(&:text)).to eq([
-      "10gp gem Azurite (opaque mottled deep blue)",
-      "10gp gem Azurite (opaque mottled deep blue)",
-      "Philter of love"
+      "2x 10gp gem Azurite (opaque mottled deep blue)",
+      "2x Philter of love"
     ])
     expect(rows[2]).to have_link("Philter of love", href: "https://example.com/philter")
     expect(page).to have_selector(".hoard-results[role='status'][aria-live='polite'][aria-atomic='true']")
@@ -105,9 +104,8 @@ RSpec.describe "Loot generator", type: :system, js: true do
     copy_button = rows[2].find("button[aria-label='Copy treasure hoard 3 to clipboard']")
     copy_button.send_keys(:enter)
     expect(page.evaluate_script("window.copiedLoot")).to eq(<<~MARKDOWN.chomp)
-      - 10gp gem Azurite (opaque mottled deep blue)
-      - 10gp gem Azurite (opaque mottled deep blue)
-      - [Philter of love](https://example.com/philter)
+      - 2x 10gp gem Azurite (opaque mottled deep blue)
+      - 2x [Philter of love](https://example.com/philter)
     MARKDOWN
     expect(page).to have_selector("[data-loot-target='hoardCopyStatus']", text: "Treasure hoard 3 copied to clipboard", visible: :all)
 
@@ -129,7 +127,7 @@ RSpec.describe "Loot generator", type: :system, js: true do
     results = page.evaluate_async_script(<<~JAVASCRIPT)
       const done = arguments[arguments.length - 1];
 
-      import("controllers/loot_controller").then(({ weightedSelection, sampleBoundedGaussian, inclusiveUniformInteger, generateTreasureHoard, hoardMarkdown }) => {
+      import("controllers/loot_controller").then(({ weightedSelection, sampleBoundedGaussian, inclusiveUniformInteger, generateTreasureHoard, consolidateHoardEntries, hoardMarkdown }) => {
         const sequence = (values) => {
           let calls = 0;
           return { random: () => values[calls++], calls: () => calls };
@@ -147,6 +145,12 @@ RSpec.describe "Loot generator", type: :system, js: true do
         };
         const art = generateTreasureHoard(data, "test", sequence([0, 0, 0]).random);
         const magic = generateTreasureHoard(data, "magic", sequence([0, 0, 0, 0]).random);
+        const consolidatedArt = consolidateHoardEntries(art);
+        const consolidatedMagic = consolidateHoardEntries(magic);
+        const separatelyLinkedMagic = consolidateHoardEntries([
+          ...magic,
+          { kind: "magic", text: "Potion", link: "https://example.com/other-potion" }
+        ]);
 
         done({
           weightedFirst: weightedSelection(weighted, () => 0).name,
@@ -158,7 +162,10 @@ RSpec.describe "Loot generator", type: :system, js: true do
           inclusiveMaximum: inclusiveUniformInteger(2, 6, () => 0.999999),
           art: art.map((entry) => entry.text),
           magic: magic.map((entry) => entry.text),
-          markdown: hoardMarkdown(magic),
+          consolidatedArt: consolidatedArt.map(({ text, count }) => ({ text, count })),
+          separatelyLinkedMagic: separatelyLinkedMagic.map(({ text, link, count }) => ({ text, link, count })),
+          markdown: hoardMarkdown(consolidatedMagic),
+          separatelyLinkedMarkdown: hoardMarkdown(separatelyLinkedMagic),
           empty: hoardMarkdown(generateTreasureHoard(data, "empty", () => 0))
         });
       }).catch((error) => done({ error: error.message }));
@@ -171,7 +178,13 @@ RSpec.describe "Loot generator", type: :system, js: true do
       "inclusiveMinimum" => 2, "inclusiveMaximum" => 6,
       "art" => [ "25gp art Silver ewer", "25gp art Silver ewer" ],
       "magic" => [ "Potion", "Potion" ],
-      "markdown" => "- [Potion](https://example.com/potion)\n- [Potion](https://example.com/potion)",
+      "consolidatedArt" => [ { "text" => "25gp art Silver ewer", "count" => 2 } ],
+      "separatelyLinkedMagic" => [
+        { "text" => "Potion", "link" => "https://example.com/potion", "count" => 2 },
+        { "text" => "Potion", "link" => "https://example.com/other-potion", "count" => 1 }
+      ],
+      "markdown" => "- 2x [Potion](https://example.com/potion)",
+      "separatelyLinkedMarkdown" => "- 2x [Potion](https://example.com/potion)\n- [Potion](https://example.com/other-potion)",
       "empty" => "Empty hoard"
     )
   end
@@ -271,7 +284,7 @@ RSpec.describe "Loot generator", type: :system, js: true do
       { challenge_rating: "0-4", weight: 1 },
       { challenge_rating: "0-4", weight: 1, valuable_type: "gems", valuable_value: "10 gp", valuable_min_count: 2, valuable_max_count: 2 },
       { challenge_rating: "0-4", weight: 1, item_type: "A", item_min: 1, item_max: 1 },
-      { challenge_rating: "0-4", weight: 1, valuable_type: "gems", valuable_value: "10 gp", valuable_min_count: 2, valuable_max_count: 2, item_type: "A", item_min: 1, item_max: 1 }
+      { challenge_rating: "0-4", weight: 1, valuable_type: "gems", valuable_value: "10 gp", valuable_min_count: 2, valuable_max_count: 2, item_type: "A", item_min: 2, item_max: 2 }
     ])
     valuables_table.gemstone_art_entries.create!([
       { entry_type: "Gemstone", value: "10 gp", weight: 1, description: "Azurite (opaque mottled deep blue)" },
