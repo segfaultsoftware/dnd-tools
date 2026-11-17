@@ -21,6 +21,8 @@ jobs:
       - name: Set up Chrome
         id: chrome
         uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 157.0.8103.78
 
       - name: Build Tailwind CSS
         run: bin/rails tailwindcss:build
