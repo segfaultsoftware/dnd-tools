@@ -9,7 +9,7 @@ RSpec.describe "Public content", type: :system, js: true do
       expect(page).to have_selector("h1 + .changelog-preview + a", text: "Expand")
       expect(page).to have_css("a.changelog-expand[href='#{changelog_path}'][target='_blank'][rel='noopener']", text: "Expand")
       expect(page).to have_css(".changelog-expand svg[aria-hidden='true']")
-      expect(page).to have_text("HELLO WORLD")
+      expect(page).to have_text("Require every commit to include a brief, categorized changelog entry.")
       expect(page).to have_text("Unique session views")
       expect(page).to have_text("45")
       expect(page).to have_text("Campaigns")
@@ -42,7 +42,7 @@ RSpec.describe "Public content", type: :system, js: true do
     visit changelog_path
 
     expect(page).to have_selector("h1", text: "Changelog")
-    expect(page).to have_selector("pre.changelog", text: "HELLO WORLD")
+    expect(page).to have_selector("pre.changelog", text: "Require every commit to include a brief, categorized changelog entry.")
     expect(page).not_to have_selector(".changelog-preview")
     expect(page).to be_axe_clean
   end
