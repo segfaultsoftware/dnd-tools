@@ -192,6 +192,36 @@
     @apply min-h-48;
   }
 
+  .horde-results:not(:empty) {
+    @apply mt-6;
+  }
+
+  .treasure-horde-result-list {
+    @apply grid gap-4;
+  }
+
+  .treasure-horde-result {
+    @apply flex min-w-0 items-start gap-3 rounded-md border border-slate-300 bg-slate-50 px-3 py-3;
+  }
+
+  .treasure-horde-result ul {
+    @apply min-w-0 list-disc space-y-1 pl-5;
+  }
+
+  .treasure-horde-result li,
+  .treasure-horde-result p,
+  .treasure-horde-result a {
+    overflow-wrap: anywhere;
+  }
+
+  .treasure-horde-result a {
+    @apply rounded-sm font-semibold text-indigo-800 underline hover:text-indigo-950;
+  }
+
+  .treasure-horde-result .loot-copy-button {
+    @apply mt-0;
+  }
+
   input[type="submit"],
   .dialog-close-button {
     @apply w-full cursor-pointer rounded-md bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800;
