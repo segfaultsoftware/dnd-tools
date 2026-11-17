@@ -151,12 +151,33 @@ export function generateTreasureHoard(data, challengeRating, random = Math.rando
   })
 }
 
+export function consolidateHoardEntries(entries) {
+  const entriesByIdentity = new Map()
+
+  for (const entry of entries) {
+    const identity = JSON.stringify([entry.kind, entry.text, entry.link ?? null])
+    const consolidatedEntry = entriesByIdentity.get(identity)
+
+    if (consolidatedEntry) {
+      consolidatedEntry.count += entry.count ?? 1
+    } else {
+      entriesByIdentity.set(identity, { ...entry, count: entry.count ?? 1 })
+    }
+  }
+
+  return [...entriesByIdentity.values()]
+}
+
+function hoardEntryPrefix(entry) {
+  return entry.count > 1 ? `${entry.count}x ` : ""
+}
+
 export function hoardMarkdown(entries) {
   if (entries.length === 0) return "Empty hoard"
 
   return entries.map((entry) => entry.kind === "magic"
-    ? `- [${entry.text}](${entry.link})`
-    : `- ${entry.text}`).join("\n")
+    ? `- ${hoardEntryPrefix(entry)}[${entry.text}](${entry.link})`
+    : `- ${hoardEntryPrefix(entry)}${entry.text}`).join("\n")
 }
 
 export default class extends Controller {
@@ -216,7 +237,7 @@ export default class extends Controller {
     results.className = "treasure-hoard-result-list"
 
     for (let index = 0; index < 3; index += 1) {
-      const entries = generateTreasureHoard(this.hoardDataValue, challengeRating)
+      const entries = consolidateHoardEntries(generateTreasureHoard(this.hoardDataValue, challengeRating))
       const row = document.createElement("div")
       row.className = "treasure-hoard-result"
 
@@ -228,13 +249,15 @@ export default class extends Controller {
         const list = document.createElement("ul")
         for (const entry of entries) {
           const item = document.createElement("li")
+          const prefix = hoardEntryPrefix(entry)
           if (entry.kind === "magic") {
             const link = document.createElement("a")
             link.href = entry.link
             link.textContent = entry.text
+            if (prefix) item.append(prefix)
             item.append(link)
           } else {
-            item.textContent = entry.text
+            item.textContent = `${prefix}${entry.text}`
           }
           list.append(item)
         }
