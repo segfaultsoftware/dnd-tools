@@ -1,9 +1,8 @@
 <% content_for :title, "D&D Tools" %>
 
 <div class="landing-page">
-  <section class="changelog-section" aria-labelledby="changelog-heading">
-    <h1 id="changelog-heading">Changelog</h1>
-    <pre class="changelog changelog-preview"><%= @changelog %></pre>
+  <section class="changelog-section">
+    <div class="changelog changelog-preview"><%= render_changelog(@changelog, allow_links: false) %></div>
     <%= link_to changelog_path, class: "changelog-expand", target: "_blank", rel: "noopener" do %>
       <span>Expand</span>
       <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">

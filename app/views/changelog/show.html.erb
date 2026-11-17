@@ -1,6 +1,5 @@
 <% content_for :title, "Changelog" %>
 
-<section class="changelog-section" aria-labelledby="changelog-heading">
-  <h1 id="changelog-heading">Changelog</h1>
-  <pre class="changelog"><%= @changelog %></pre>
+<section class="changelog-section">
+  <div class="changelog"><%= render_changelog(@changelog) %></div>
 </section>

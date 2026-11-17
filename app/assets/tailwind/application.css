@@ -332,13 +332,71 @@
   }
 
   .changelog {
-    @apply mt-4 box-border rounded-lg border border-violet-700 bg-violet-50 px-4 font-mono text-sm leading-6 text-slate-950;
+    @apply box-border rounded-lg border border-violet-700 bg-violet-50 p-4 text-base leading-6 text-slate-950;
     overflow-wrap: anywhere;
-    white-space: pre-wrap;
+  }
+
+  .changelog > * + * {
+    @apply mt-4;
+  }
+
+  .changelog h2 {
+    @apply text-2xl font-bold tracking-tight;
+  }
+
+  .changelog h3 {
+    @apply text-xl font-bold tracking-tight;
+  }
+
+  .changelog h4,
+  .changelog h5,
+  .changelog h6 {
+    @apply text-lg font-bold;
+  }
+
+  .changelog ul {
+    @apply list-disc pl-6;
+  }
+
+  .changelog ol {
+    @apply list-decimal pl-6;
+  }
+
+  .changelog li + li {
+    @apply mt-1;
+  }
+
+  .changelog a {
+    @apply rounded-sm font-semibold text-indigo-800 underline hover:text-indigo-950;
+  }
+
+  .changelog blockquote {
+    @apply border-l-4 border-violet-400 pl-4 text-slate-700;
+  }
+
+  .changelog code {
+    @apply rounded bg-violet-100 px-1 py-0.5 font-mono text-sm;
+  }
+
+  .changelog pre {
+    @apply overflow-x-auto rounded-md bg-slate-950 p-3 text-slate-50;
+  }
+
+  .changelog pre code {
+    @apply bg-transparent p-0 text-inherit;
+  }
+
+  .changelog table {
+    @apply block w-full overflow-x-auto border-collapse;
+  }
+
+  .changelog th,
+  .changelog td {
+    @apply border border-violet-300 px-3 py-2 text-left;
   }
 
   .changelog-preview {
-    block-size: calc(30 * 1lh);
+    block-size: calc(15 * 1lh);
     overflow: clip;
   }
 

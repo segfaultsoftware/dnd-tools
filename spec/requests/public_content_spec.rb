@@ -3,9 +3,20 @@ require "rails_helper"
 RSpec.describe "Public content", type: :request do
   let(:changelog) do
     [
-      "# Release <strong>notes</strong> & details",
+      "# Changelog",
+      "",
+      "## Release <strong>notes</strong> & details",
+      "",
+      "- **Important** release",
+      "- [Unsafe link](javascript:alert('unsafe'))",
+      "",
+      "<script>alert('unsafe')</script>",
+      "",
       "A-long-unbroken-line-#{'x' * 300}",
-      *Array.new(31) { |index| "Release note #{index + 1}" }
+      "",
+      *Array.new(31) { |index| "- Release note #{index + 1}" },
+      "",
+      "[Release details](https://example.com/releases)"
     ].join("\n")
   end
 
@@ -13,28 +24,32 @@ RSpec.describe "Public content", type: :request do
     allow_any_instance_of(ApplicationController).to receive(:changelog_content).and_return(changelog)
   end
 
-  it "renders the landing page publicly with escaped changelog content and placeholder stats" do
+  it "renders the landing page publicly with safe semantic changelog content and placeholder stats" do
     get root_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("# Release &lt;strong&gt;notes&lt;/strong&gt; &amp; details")
-    expect(response.body).not_to include("<strong>notes</strong>")
-    expect(response.body).to include("Release note 31")
-    expect(response.body).to include("Unique session views")
-    expect(response.body).to include(">45<")
-    expect(response.body).to include("Campaigns")
-    expect(response.body).to include(">918<")
-    expect(response.body).to include("NPCs generated")
-    expect(response.body).to include(">2,415<")
+
+    document = Nokogiri::HTML5(response.body)
+    expect_rendered_changelog(document)
+    expect(document.css("main h1").map(&:text)).to eq([ "Changelog" ])
+    expect(document.css("main h2").map(&:text)).to eq([ "Release <strong>notes</strong> & details", "Stats" ])
+    expect(document.at_css(".changelog-preview + a.changelog-expand")).to be_present
+    expect(document.css(".changelog-preview a")).to be_empty
+    expect(document.css(".stats-list dt").map(&:text)).to eq([ "Unique session views", "Campaigns", "NPCs generated" ])
+    expect(document.css(".stats-list dd").map(&:text)).to eq([ "45", "918", "2,415" ])
   end
 
-  it "renders the complete escaped changelog publicly" do
+  it "renders the complete safe semantic changelog publicly" do
     get changelog_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("# Release &lt;strong&gt;notes&lt;/strong&gt; &amp; details")
-    expect(response.body).not_to include("<strong>notes</strong>")
-    expect(response.body).to include("Release note 31")
+
+    document = Nokogiri::HTML5(response.body)
+    expect_rendered_changelog(document)
+    expect(document.css("main h1").map(&:text)).to eq([ "Changelog" ])
+    expect(document.at_css(".changelog")["class"].split).not_to include("changelog-preview")
+    expect(document.at_css(".changelog a[href='https://example.com/releases']").text).to eq("Release details")
+    expect(document.css(".changelog a").map { |link| link["href"].to_s }).not_to include(a_string_starting_with("javascript:"))
   end
 
   it "renders the loot generator publicly with the exact controls and page structure" do
@@ -73,5 +88,16 @@ RSpec.describe "Public content", type: :request do
       "valuables" => [ include("description" => "SQL-backed gem") ],
       "magic_items" => [ include("name" => "SQL-backed item", "link" => "https://example.com/item") ]
     )
+  end
+
+  def expect_rendered_changelog(document)
+    changelog = document.at_css(".changelog")
+
+    expect(changelog.at_css("h1").text).to eq("Changelog")
+    expect(changelog.at_css("h2").text).to eq("Release <strong>notes</strong> & details")
+    expect(changelog.css("h1 a, h2 a, h2 strong, script")).to be_empty
+    expect(changelog.at_css("li strong").text).to eq("Important")
+    expect(changelog.text).to include("<script>alert('unsafe')</script>", "Release note 31", "Release details")
+    expect(changelog.text).not_to include("# Changelog", "## Release", "**Important**")
   end
 end
